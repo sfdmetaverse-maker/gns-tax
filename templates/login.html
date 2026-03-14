@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{% if register %}Create Account{% else %}Sign In{% endif %} — {{ branding.name if branding else "Gleam &amp; Sip" }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garabond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: {{ branding.primary_color if branding else "#92702a" }};
+  --accent-light: {{ branding.primary_color if branding else "#b8923e" }};
+  --accent-muted: rgba(146,112,42,0.08);
+  --bg: #f6f3ee;
+  --surface: #ffffff;
+  --border: #e2ddd4;
+  --border-focus: {{ branding.primary_color if branding else "#92702a" }};
+  --text: #2c2822;
+  --text-secondary: #6b6259;
+  --text-tertiary: #9a9085;
+  --red: #b44040;
+  --green: #4a9e6d;
+  --shadow-sm: 0 1px 3px rgba(44,40,34,0.06);
+  --shadow-md: 0 4px 16px rgba(44,40,34,0.08);
+  --shadow-lg: 0 12px 40px rgba(44,40,34,0.12);
+  --radius: 12px;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(146,112,42,0.06), transparent 60%),
+    radial-gradient(ellipse 60% 80% at 85% 90%, rgba(146,112,42,0.04), transparent 50%);
+  pointer-events: none;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 1;
+}
+
+.brand {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.brand-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1rem;
+  background: var(--accent);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(146,112,42,0.25);
+}
+
+.brand-icon svg {
+  width: 26px;
+  height: 26px;
+  stroke: #fff;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.brand-logo {
+  max-height: 64px;
+  margin: 0 auto 1rem;
+  display: block;
+}
+
+.brand h1 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.brand p {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-top: 0.35rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+}
+
+.card-sub {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  margin-bottom: 1.75rem;
+}
+
+.flash-messages {
+  margin-bottom: 1rem;
+}
+
+.flash {
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  background: #fff3e0;
+  color: #8b6914;
+  border: 1px solid #e6c97a;
+  animation: flash-in 0.3s ease;
+}
+
+.flash.error {
+  background: #fef2f2;
+  color: var(--red);
+  border-color: #f5c6c6;
+}
+
+@keyframes flash-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.field {
+  margin-bottom: 1.15rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(146,112,42,0.1);
+  background: #fff;
+}
+
+.field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  margin-top: 0.5rem;
+}
+
+.submit-btn:hover {
+  background: var(--accent-light);
+  box-shadow: 0 4px 16px rgba(146,112,42,0.3);
+  transform: translateY(-1px);
+}
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+.switch {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+
+.switch a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.15s;
+}
+
+.switch a:hover {
+  color: var(--accent-light);
+  text-decoration: underline;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.join-toggle {
+  text-align: center;
+  margin-bottom: 1rem;
+  font-size: 0.78rem;
+}
+.join-toggle a {
+  color: var(--text-tertiary);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+  transition: color 0.15s;
+}
+.join-toggle a:hover { color: var(--accent); }
+
+@media (max-width: 480px) {
+  .card { padding: 1.5rem; }
+  .brand h1 { font-size: 1.6rem; }
+  .field input { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="login-container">
+  <div class="brand">
+    {% if branding and branding.logo_url %}
+    <img src="{{ branding.logo_url }}" alt="{{ branding.name }}" class="brand-logo">
+    {% else %}
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    {% endif %}
+    <h1>{{ branding.name if branding else "Gleam &amp; Sip" }}</h1>
+    <p>{{ branding.tagline if branding else "Tax Filing Assistant" }}</p>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+  <div class="flash-messages">
+    {% for msg in messages %}
+    <div class="flash">{{ msg }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    {% if register %}
+    <div class="card-title">Create Account</div>
+    <div class="card-sub">Set up your business tax filing workspace</div>
+
+    <form method="post" action="{{ url_for('auth.register', slug=slug) if slug else url_for('auth.register') }}">
+      {% if slug %}
+      <div class="field">
+        <label for="invite_code">Invite Code</label>
+        <input type="text" id="invite_code" name="invite_code" placeholder="Enter your invite code" required>
+      </div>
+      {% else %}
+      <div class="field" id="biz-name-section">
+        <label for="business_name">Business Name</label>
+        <input type="text" id="business_name" name="business_name" placeholder="Your business name" required>
+      </div>
+      {% endif %}
+      <div class="field">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="you@business.com" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="At least 6 characters" required minlength="6">
+      </div>
+      <div class="field">
+        <label for="confirm">Confirm Password</label>
+        <input type="password" id="confirm" name="confirm" placeholder="Re-enter your password" required minlength="6">
+      </div>
+      {% if not slug %}
+      <div class="join-toggle">
+        <a href="#" id="join-toggle-link" onclick="event.preventDefault(); toggleJoinMode();">Joining an existing team?</a>
+      </div>
+      <div class="field" id="invite-section" style="display:none;">
+        <label for="invite_code">Invite Code</label>
+        <input type="text" id="invite_code" name="invite_code" placeholder="Enter the code from your team admin">
+      </div>
+      {% endif %}
+      <button type="submit" class="submit-btn">Create Account</button>
+    </form>
+    {% if not slug %}
+    <script>
+    function toggleJoinMode() {
+      const inviteSection = document.getElementById('invite-section');
+      const bizSection = document.getElementById('biz-name-section');
+      const bizInput = document.getElementById('business_name');
+      const link = document.getElementById('join-toggle-link');
+      const joining = inviteSection.style.display === 'none';
+      inviteSection.style.display = joining ? 'block' : 'none';
+      bizSection.style.display = joining ? 'none' : 'block';
+      bizInput.required = !joining;
+      link.textContent = joining ? 'Creating a new business instead?' : 'Joining an existing team?';
+    }
+    </script>
+    {% endif %}
+
+    <div class="switch">
+      Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a>
+    </div>
+
+    {% else %}
+    <div class="card-title">Welcome Back</div>
+    <div class="card-sub">Sign in to continue your tax filing</div>
+
+    <form method="post" action="{{ url_for('auth.login') }}">
+      <div class="field">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="you@business.com" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Your password" required>
+      </div>
+      <button type="submit" class="submit-btn">Sign In</button>
+    </form>
+
+    <div class="switch">
+      New here? <a href="{{ url_for('auth.register') }}">Create an account</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+</body>
+</html>

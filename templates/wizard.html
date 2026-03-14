@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{{ data.business.name }} - Step-by-Step Filing Guide</title>
+<style>
+  :root {
+    --bg: #faf9f6; --card: #ffffff; --accent: #2d5016; --accent-light: #e8f0e2;
+    --text: #1a1a1a; --muted: #6b7280; --border: #e5e7eb;
+    --red: #dc2626; --green: #16a34a; --blue: #2563eb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    max-width: 700px; margin: 0 auto; padding: 1.5rem;
+  }
+  header { text-align: center; margin-bottom: 2rem; }
+  header h1 { font-size: 1.5rem; color: var(--accent); }
+  header p { color: var(--muted); font-size: 0.9rem; }
+
+  /* Progress bar */
+  .progress { display: flex; gap: 0; margin-bottom: 2rem; }
+  .progress .step-dot {
+    flex: 1; text-align: center; padding: 0.5rem 0.25rem; font-size: 0.7rem;
+    color: var(--muted); border-bottom: 3px solid var(--border); position: relative;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .progress .step-dot.done { border-bottom-color: var(--green); color: var(--green); }
+  .progress .step-dot.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .progress .step-dot .num {
+    display: inline-block; width: 20px; height: 20px; line-height: 20px;
+    border-radius: 50%; font-size: 0.7rem; margin-bottom: 0.15rem;
+    background: var(--border); color: #fff;
+  }
+  .progress .step-dot.done .num { background: var(--green); }
+  .progress .step-dot.active .num { background: var(--accent); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .card h2 { font-size: 1.15rem; color: var(--accent); margin-bottom: 0.25rem; }
+  .card .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+
+  .field { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.6rem; }
+  .field label { flex: 1; font-size: 0.875rem; }
+  .field input, .field select {
+    width: 220px; padding: 0.45rem 0.6rem; border: 1px solid var(--border);
+    border-radius: 5px; font-size: 0.875rem; text-align: right;
+  }
+  .field select { text-align: left; }
+  .field input[type="text"], .field input[type="date"] { text-align: left; }
+  .field-check { justify-content: flex-start; }
+  .field-check input { width: auto; }
+  .field-check label { flex: none; }
+
+  .checklist { list-style: none; padding: 0; }
+  .checklist li {
+    padding: 0.6rem 0; border-bottom: 1px solid var(--border);
+    font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { width: 22px; height: 22px; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0; }
+  .check-icon.done { background: var(--green); color: #fff; }
+  .check-icon.pending { background: var(--border); color: var(--muted); }
+
+  .nav { display: flex; justify-content: space-between; margin-top: 1.5rem; }
+  .btn {
+    padding: 0.55rem 1.5rem; border: none; border-radius: 6px; font-size: 0.9rem;
+    cursor: pointer; font-weight: 500; text-decoration: none; display: inline-block;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #1e3a0e; }
+  .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: #f3f4f6; }
+  .btn-save { background: var(--green); color: #fff; }
+  .btn-save:hover { background: #15803d; }
+
+  .summary-row { display: flex; justify-content: space-between; padding: 0.3rem 0; font-size: 0.875rem; }
+  .summary-row.total { font-weight: 700; border-top: 2px solid var(--text); padding-top: 0.5rem; margin-top: 0.25rem; }
+  .amt { font-variant-numeric: tabular-nums; }
+
+  .result-box { text-align: center; padding: 1.25rem; border-radius: 8px; margin: 1rem 0; }
+  .result-box.owing { background: #fef2f2; border: 1px solid #fecaca; }
+  .result-box.refund { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .result-box .big { font-size: 1.8rem; font-weight: 700; }
+  .result-box .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+
+  .note { font-size: 0.8rem; color: var(--muted); margin-top: 0.75rem; font-style: italic; }
+  .tip { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+    padding: 0.75rem; font-size: 0.82rem; margin: 0.75rem 0; }
+
+  .import-box {
+    border: 2px dashed var(--border); border-radius: 8px; padding: 1.25rem;
+    text-align: center; margin: 0.75rem 0;
+  }
+
+  .flash { background: var(--accent-light); color: var(--accent); padding: 0.6rem 1rem;
+    border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>{{ data.business.name }}</h1>
+  <p>Step-by-Step Tax Filing Guide</p>
+  <div style="margin-top:0.5rem; display:flex; justify-content:center; gap:0.75rem; align-items:center;">
+    <a href="/" style="font-size:0.8rem; color:var(--accent);">Dashboard</a>
+    {% if user %}
+    <span style="font-size:0.75rem; color:var(--muted);">{{ user.email }}</span>
+    <a href="/logout" style="font-size:0.8rem; color:var(--muted);">Logout</a>
+    {% endif %}
+  </div>
+</header>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+{% endwith %}
+
+<!-- Progress Bar -->
+<div class="progress">
+  {% set steps = ["Setup", "POS Data", "Bank & CC", "Receipts", "Review", "Adjustments", "File"] %}
+  {% for s in steps %}
+  <div class="step-dot {{ 'done' if loop.index < step else ('active' if loop.index == step else '') }}">
+    <div class="num">{{ loop.index }}</div>
+    <div>{{ s }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ============================================ STEP 1: SETUP -->
+{% if step == 1 %}
+<form method="post" action="/save-settings">
+  <input type="hidden" name="wizard_step" value="1">
+  <div class="card">
+    <h2>Step 1: Business Setup</h2>
+    <p class="subtitle">Confirm your business details. These affect how your taxes are calculated.</p>
+
+    <div class="field">
+      <label>Legal Business Name</label>
+      <input type="text" name="biz_name" value="{{ data.business.name }}">
+    </div>
+    <div class="field">
+      <label>Business Number (BN)</label>
+      <input type="text" name="biz_bn" value="{{ data.business.bn }}" placeholder="123456789RC0001">
+    </div>
+    <div class="field">
+      <label>Province</label>
+      <select name="biz_province">
+        {% for prov in provinces %}
+        <option value="{{ prov }}" {{ "selected" if prov == data.business.province }}>{{ prov }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Fiscal Year End</label>
+      <input type="date" name="biz_fye" value="{{ data.business.fiscal_year_end }}">
+    </div>
+    <div class="field field-check">
+      <input type="checkbox" name="biz_ccpc" id="biz_ccpc" {{ "checked" if data.business.ccpc }}>
+      <label for="biz_ccpc">Canadian-Controlled Private Corporation (CCPC)</label>
+    </div>
+
+    <div class="tip">
+      Most small Canadian businesses are CCPCs and qualify for the small business tax rate (9% federal). Your BN is on any CRA correspondence.
+    </div>
+  </div>
+
+  <div class="nav">
+    <a href="/" class="btn btn-outline">Save & Exit</a>
+    <div>
+      <button type="submit" class="btn btn-save" style="margin-right:0.5rem;">Save</button>
+      <a href="/wizard?step=2" class="btn btn-primary">Next: POS Data &rarr;</a>
+    </div>
+  </div>
+</form>
+{% endif %}
+
+<!-- ============================================ STEP 2: POS DATA -->
+{% if step == 2 %}
+<div class="card">
+  <h2>Step 2: Import POS Sales Data</h2>
+  <p class="subtitle">Export your sales data from each POS system and import it here. This captures your revenue and GST/HST collected.</p>
+
+  <ul class="checklist">
+    <li>
+      <span class="check-icon {{ 'done' if txns|selectattr('source','equalto','Toast')|list else 'pending' }}">{{ '&#10003;' if txns|selectattr('source','equalto','Toast')|list else '1' }}</span>
+      <div>
+        <strong>Toast POS</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Restaurant Admin &rarr; Reports &rarr; Payments &rarr; Export CSV</span>
+      </div>
+    </li>
+    <li>
+      <span class="check-icon {{ 'done' if txns|selectattr('source','equalto','Square')|list else 'pending' }}">{{ '&#10003;' if txns|selectattr('source','equalto','Square')|list else '2' }}</span>
+      <div>
+        <strong>Square POS</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Dashboard &rarr; Transactions &rarr; Export</span>
+      </div>
+    </li>
+    <li>
+      <span class="check-icon {{ 'done' if txns|selectattr('source','equalto','GoDaddy')|list else 'pending' }}">{{ '&#10003;' if txns|selectattr('source','equalto','GoDaddy')|list else '3' }}</span>
+      <div>
+        <strong>GoDaddy</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Payments &rarr; Transactions &rarr; Download CSV</span>
+      </div>
+    </li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>Upload POS CSV</h2>
+  <form method="post" action="/import-csv" enctype="multipart/form-data">
+    <div class="import-box">
+      <div class="field" style="justify-content:center; margin-bottom:0.75rem;">
+        <label style="flex:none;">Source:</label>
+        <select name="csv_source" style="width:180px;">
+          <option value="Toast">Toast POS</option>
+          <option value="Square">Square POS</option>
+          <option value="GoDaddy">GoDaddy</option>
+        </select>
+      </div>
+      <input type="file" name="csv_file" accept=".csv,.CSV"><br>
+      <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">Import</button>
+    </div>
+  </form>
+  <p class="note">You can import multiple files. Each import adds to your transaction list (no duplicates check yet, so don't import the same file twice).</p>
+</div>
+
+<div class="nav">
+  <a href="/" class="btn btn-outline">Save & Exit</a>
+  <div>
+    <a href="/wizard?step=1" class="btn btn-outline" style="margin-right:0.5rem;">&larr; Back</a>
+    <a href="/wizard?step=3" class="btn btn-primary">Next: Bank & CC &rarr;</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================================ STEP 3: BANK & CREDIT CARD -->
+{% if step == 3 %}
+<div class="card">
+  <h2>Step 3: Import Bank & Credit Card Statements</h2>
+  <p class="subtitle">This captures expenses, payments, and any transactions not processed through your POS systems.</p>
+
+  <ul class="checklist">
+    <li>
+      <span class="check-icon {{ 'done' if txns|selectattr('source','equalto','Bank')|list else 'pending' }}">{{ '&#10003;' if txns|selectattr('source','equalto','Bank')|list else '1' }}</span>
+      <div>
+        <strong>Bank Account Statement</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Online banking &rarr; Account &rarr; Statements &rarr; Download CSV</span>
+      </div>
+    </li>
+    <li>
+      <span class="check-icon {{ 'done' if txns|selectattr('source','equalto','Credit Card')|list else 'pending' }}">{{ '&#10003;' if txns|selectattr('source','equalto','Credit Card')|list else '2' }}</span>
+      <div>
+        <strong>Credit Card Statement</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Online banking &rarr; Credit Card &rarr; Transactions &rarr; Download CSV</span>
+      </div>
+    </li>
+  </ul>
+
+  <div class="tip">
+    Bank/CC statements usually don't include tax breakdowns. You'll add GST/HST details in the review step or from individual receipts.
+  </div>
+</div>
+
+<div class="card">
+  <h2>Upload Statement CSV</h2>
+  <form method="post" action="/import-csv" enctype="multipart/form-data">
+    <div class="import-box">
+      <div class="field" style="justify-content:center; margin-bottom:0.75rem;">
+        <label style="flex:none;">Source:</label>
+        <select name="csv_source" style="width:180px;">
+          <option value="Bank">Bank Statement</option>
+          <option value="Credit Card">Credit Card Statement</option>
+        </select>
+      </div>
+      <input type="file" name="csv_file" accept=".csv,.CSV"><br>
+      <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">Import</button>
+    </div>
+  </form>
+</div>
+
+<div class="nav">
+  <a href="/" class="btn btn-outline">Save & Exit</a>
+  <div>
+    <a href="/wizard?step=2" class="btn btn-outline" style="margin-right:0.5rem;">&larr; Back</a>
+    <a href="/wizard?step=4" class="btn btn-primary">Next: Receipts &rarr;</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================================ STEP 4: PAPER RECEIPTS -->
+{% if step == 4 %}
+<div class="card">
+  <h2>Step 4: Enter Paper Receipts</h2>
+  <p class="subtitle">For any receipts not captured by your POS or bank imports, enter them here. This is especially important for cash purchases and expense receipts with GST/HST.</p>
+
+  <div class="tip">
+    <strong>Tip:</strong> Use "Take Photo" below to snap receipts with your phone camera, or bulk upload files from your computer.
+  </div>
+</div>
+
+<div class="card">
+  <h2>Scan Receipts</h2>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+    <form method="post" action="/upload-receipts" enctype="multipart/form-data">
+      <input type="hidden" name="redirect" value="/wizard?step=4">
+      <div class="upload-zone" style="cursor:pointer; position:relative; text-align:center; padding:1.5rem;" onclick="this.querySelector('input[type=file]').click()">
+        <div style="font-size:2rem; margin-bottom:0.5rem;">📷</div>
+        <div style="font-weight:600;">Take Photo</div>
+        <div style="font-size:0.85rem; color:var(--muted);">Open camera on your phone</div>
+        <input type="file" name="receipt_files" accept="image/*" capture="environment" style="position:absolute;opacity:0;width:100%;height:100%;top:0;left:0;cursor:pointer;">
+        <button type="submit" class="btn" style="margin-top:0.75rem;">Upload &amp; OCR</button>
+      </div>
+    </form>
+    <form method="post" action="/upload-receipts" enctype="multipart/form-data">
+      <input type="hidden" name="redirect" value="/wizard?step=4">
+      <div class="upload-zone" style="text-align:center; padding:1.5rem;">
+        <div style="font-size:2rem; margin-bottom:0.5rem;">📁</div>
+        <div style="font-weight:600;">Upload Files</div>
+        <div style="font-size:0.85rem; color:var(--muted);">PNG, JPG, PDF &mdash; multiple</div>
+        <input type="file" name="receipt_files" accept="image/*,.pdf" multiple>
+        <button type="submit" class="btn" style="margin-top:0.75rem;">Upload &amp; OCR</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Quick Add Receipt</h2>
+  <form method="post" action="/receipt">
+    <div class="field">
+      <label>Date</label>
+      <input type="date" name="r_date" required>
+    </div>
+    <div class="field">
+      <label>Vendor / Description</label>
+      <input type="text" name="r_desc" placeholder="e.g. Staples - paper" required style="text-align:left;">
+    </div>
+    <div class="field">
+      <label>Amount (before tax)</label>
+      <input type="number" step="0.01" name="r_amount" placeholder="0.00" required>
+    </div>
+    <div class="field">
+      <label>HST/GST amount</label>
+      <input type="number" step="0.01" name="r_tax" value="0" placeholder="0.00">
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select name="r_type">
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select name="r_category">
+        <optgroup label="COGS">
+          <option value="purchases" selected>Inventory / Purchases</option>
+        </optgroup>
+        <optgroup label="Expenses">
+          {% for k in ["wages","rent","utilities","insurance","office_supplies","professional_fees","advertising","travel","meals_entertainment","interest","other"] %}
+          <option value="{{ k }}">{{ categories[k] }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="Revenue">
+          <option value="sales">Sales Revenue</option>
+          <option value="other_income">Other Income</option>
+        </optgroup>
+      </select>
+    </div>
+    <div style="text-align:right; margin-top:0.75rem;">
+      <button type="submit" class="btn btn-save">Add Receipt</button>
+    </div>
+  </form>
+</div>
+
+{% set receipt_txns = txns|selectattr('source','equalto','Receipt')|list %}
+{% if receipt_txns %}
+<div class="card">
+  <h2>Receipts Added ({{ receipt_txns|length }})</h2>
+  <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+    <tr style="border-bottom:2px solid var(--border);">
+      <th style="text-align:left; padding:0.3rem;">Date</th>
+      <th style="text-align:left; padding:0.3rem;">Description</th>
+      <th style="text-align:right; padding:0.3rem;">Amount</th>
+      <th style="text-align:right; padding:0.3rem;">Tax</th>
+    </tr>
+    {% for t in receipt_txns %}
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:0.3rem;">{{ t.date }}</td>
+      <td style="padding:0.3rem;">{{ t.description }}</td>
+      <td style="padding:0.3rem; text-align:right;">${{ "{:,.2f}".format(t.amount|abs) }}</td>
+      <td style="padding:0.3rem; text-align:right;">${{ "{:,.2f}".format(t.tax|abs) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="nav">
+  <a href="/" class="btn btn-outline">Save & Exit</a>
+  <div>
+    <a href="/wizard?step=3" class="btn btn-outline" style="margin-right:0.5rem;">&larr; Back</a>
+    <a href="/wizard?step=5" class="btn btn-primary">Next: Review &rarr;</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================================ STEP 5: REVIEW CATEGORIES -->
+{% if step == 5 %}
+<div class="card">
+  <h2>Step 5: Review & Categorize</h2>
+  <p class="subtitle">Check that each transaction is in the right category. Focus on items marked "Other Expenses" - these were auto-categorized and may need fixing.</p>
+</div>
+
+{% set other_txns = txns|selectattr('category','equalto','other')|list %}
+{% if other_txns %}
+<form method="post" action="/bulk-update">
+  <div class="card">
+    <h2 style="color:var(--red);">Needs Review ({{ other_txns|length }})</h2>
+    <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+      <tr style="border-bottom:2px solid var(--border);">
+        <th style="text-align:left; padding:0.3rem;">Date</th>
+        <th style="text-align:left; padding:0.3rem;">Description</th>
+        <th style="text-align:right; padding:0.3rem;">Amount</th>
+        <th style="text-align:left; padding:0.3rem;">Category</th>
+      </tr>
+      {% for t in other_txns %}
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.3rem;">{{ t.date }}</td>
+        <td style="padding:0.3rem;">{{ t.description }}</td>
+        <td style="padding:0.3rem; text-align:right;">${{ "{:,.2f}".format(t.amount|abs) }}</td>
+        <td style="padding:0.3rem;">
+          <select name="cat_{{ t.id }}" style="font-size:0.78rem; padding:0.2rem; border:1px solid var(--border); border-radius:3px;">
+            {% for k, v in categories.items() %}
+            <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+            {% endfor %}
+          </select>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div style="text-align:right; margin-top:0.75rem;">
+      <button type="submit" class="btn btn-save">Save Categories</button>
+    </div>
+  </div>
+</form>
+{% else %}
+<div class="card" style="text-align:center; padding:1.5rem;">
+  <div style="font-size:1.5rem; color:var(--green); margin-bottom:0.5rem;">&#10003;</div>
+  <p>All {{ txn_count }} transactions are categorized!</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Category Summary</h2>
+  {% set ns = namespace(rev=0, exp=0) %}
+  <div class="summary-row" style="font-weight:600; color:var(--accent);">
+    <span>Revenue</span><span></span>
+  </div>
+  {% for k in ["sales", "other_income"] %}
+  {% if agg.revenue.get(k, 0) > 0 %}
+  {% set ns.rev = ns.rev + agg.revenue[k] %}
+  <div class="summary-row"><span style="padding-left:1rem;">{{ categories[k] }}</span><span class="amt">${{ "{:,.2f}".format(agg.revenue[k]) }}</span></div>
+  {% endif %}
+  {% endfor %}
+  <div class="summary-row" style="font-weight:600; color:var(--accent); margin-top:0.5rem;">
+    <span>Expenses</span><span></span>
+  </div>
+  {% for k in ["purchases","wages","rent","utilities","insurance","office_supplies","professional_fees","advertising","travel","meals_entertainment","interest","other"] %}
+  {% if agg.expenses.get(k, 0) > 0 or (k == "purchases" and agg.cogs.get("purchases", 0) > 0) %}
+  {% set val = agg.cogs.purchases if k == "purchases" else agg.expenses[k] %}
+  {% set ns.exp = ns.exp + val %}
+  <div class="summary-row"><span style="padding-left:1rem;">{{ categories[k] }}</span><span class="amt">${{ "{:,.2f}".format(val) }}</span></div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div class="nav">
+  <a href="/" class="btn btn-outline">Save & Exit</a>
+  <div>
+    <a href="/wizard?step=4" class="btn btn-outline" style="margin-right:0.5rem;">&larr; Back</a>
+    <a href="/wizard?step=6" class="btn btn-primary">Next: Adjustments &rarr;</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================================ STEP 6: MANUAL ADJUSTMENTS -->
+{% if step == 6 %}
+<form method="post" action="/save-settings">
+  <div class="card">
+    <h2>Step 6: Manual Adjustments</h2>
+    <p class="subtitle">Enter values that aren't captured in your transaction data.</p>
+
+    <div class="field">
+      <label>Opening Inventory Value</label>
+      <input type="number" step="0.01" name="adj_opening_inventory" value="{{ data.manual_adjustments.opening_inventory }}">
+    </div>
+    <div class="field">
+      <label>Closing Inventory Value</label>
+      <input type="number" step="0.01" name="adj_closing_inventory" value="{{ data.manual_adjustments.closing_inventory }}">
+    </div>
+    <div class="field">
+      <label>Capital Cost Allowance (CCA)</label>
+      <input type="number" step="0.01" name="adj_depreciation_cca" value="{{ data.manual_adjustments.depreciation_cca }}">
+    </div>
+    <div class="field">
+      <label>GST/HST Installments Already Paid</label>
+      <input type="number" step="0.01" name="adj_gst_installments" value="{{ data.manual_adjustments.gst_installments_paid }}">
+    </div>
+
+    <!-- Pass through business fields unchanged -->
+    <input type="hidden" name="biz_name" value="{{ data.business.name }}">
+    <input type="hidden" name="biz_bn" value="{{ data.business.bn }}">
+    <input type="hidden" name="biz_province" value="{{ data.business.province }}">
+    <input type="hidden" name="biz_fye" value="{{ data.business.fiscal_year_end }}">
+    {% if data.business.ccpc %}<input type="hidden" name="biz_ccpc" value="on">{% endif %}
+
+    <div class="tip">
+      <strong>CCA:</strong> If you own equipment, vehicles, or other depreciable assets, calculate CCA using CRA's rules (or ask your accountant). This is a non-cash deduction.<br><br>
+      <strong>Inventory:</strong> Opening = what you had at start of fiscal year. Closing = what you have at end. The difference flows into cost of goods sold.
+    </div>
+
+    <div style="text-align:right; margin-top:0.75rem;">
+      <button type="submit" class="btn btn-save">Save Adjustments</button>
+    </div>
+  </div>
+</form>
+
+<div class="nav">
+  <a href="/" class="btn btn-outline">Save & Exit</a>
+  <div>
+    <a href="/wizard?step=5" class="btn btn-outline" style="margin-right:0.5rem;">&larr; Back</a>
+    <a href="/wizard?step=7" class="btn btn-primary">Next: Review & File &rarr;</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================================ STEP 7: FINAL REVIEW & FILE -->
+{% if step == 7 %}
+<div class="card">
+  <h2>Step 7: Review & File</h2>
+  <p class="subtitle">Here's your complete tax summary. Review the numbers, then file with CRA.</p>
+</div>
+
+<div class="card">
+  <h2>T2 Corporate Income Tax</h2>
+  <div class="summary-row"><span>Total Revenue</span><span class="amt">${{ "{:,.2f}".format(t2.total_revenue) }}</span></div>
+  <div class="summary-row"><span>Cost of Goods Sold</span><span class="amt">(${{ "{:,.2f}".format(t2.cost_of_goods) }})</span></div>
+  <div class="summary-row" style="font-weight:600;"><span>Gross Profit</span><span class="amt">${{ "{:,.2f}".format(t2.gross_profit) }}</span></div>
+  <div class="summary-row"><span>Operating Expenses</span><span class="amt">(${{ "{:,.2f}".format(t2.total_expenses) }})</span></div>
+  <div class="summary-row total"><span>Net Income</span><span class="amt">${{ "{:,.2f}".format(t2.net_income) }}</span></div>
+  <br>
+  <div class="summary-row"><span>Federal Tax</span><span class="amt">${{ "{:,.2f}".format(t2.federal_tax) }}</span></div>
+  <div class="summary-row"><span>Provincial Tax ({{ t2.province }})</span><span class="amt">${{ "{:,.2f}".format(t2.provincial_tax) }}</span></div>
+  <div class="result-box {{ 'owing' if t2.total_tax > 0 else 'refund' }}">
+    <div class="label">Total Corporate Tax</div>
+    <div class="big">${{ "{:,.2f}".format(t2.total_tax) }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ gst.rate_label }} Return</h2>
+  <div class="summary-row"><span>{{ gst.rate_label }} Collected</span><span class="amt">${{ "{:,.2f}".format(gst.collected) }}</span></div>
+  <div class="summary-row"><span>Input Tax Credits</span><span class="amt">(${{ "{:,.2f}".format(gst.total_itc) }})</span></div>
+  <div class="summary-row"><span>Net Tax</span><span class="amt">${{ "{:,.2f}".format(gst.net_tax) }}</span></div>
+  <div class="summary-row"><span>Installments Paid</span><span class="amt">(${{ "{:,.2f}".format(gst.installments) }})</span></div>
+  <div class="result-box {{ 'owing' if gst.balance > 0 else 'refund' }}">
+    <div class="label">{{ "GST/HST Owing" if gst.balance >= 0 else "GST/HST Refund" }}</div>
+    <div class="big">${{ "{:,.2f}".format(gst.balance|abs) }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Next Steps: Filing with CRA</h2>
+  <ul class="checklist">
+    <li>
+      <span class="check-icon pending">1</span>
+      <div>
+        <strong>File T2 Return</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Use CRA My Business Account or certified software (e.g. TurboTax T2, Wealthsimple). Due 6 months after fiscal year-end.</span>
+      </div>
+    </li>
+    <li>
+      <span class="check-icon pending">2</span>
+      <div>
+        <strong>Pay Corporate Tax</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Due 2 months after year-end (3 months for small CCPCs). Pay via CRA My Payment or your bank.</span>
+      </div>
+    </li>
+    <li>
+      <span class="check-icon pending">3</span>
+      <div>
+        <strong>File GST/HST Return</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Via CRA My Business Account or GST/HST NETFILE. Annual filers: 3 months after year-end.</span>
+      </div>
+    </li>
+    <li>
+      <span class="check-icon pending">4</span>
+      <div>
+        <strong>Keep Records</strong><br>
+        <span style="font-size:0.8rem; color:var(--muted);">Store all receipts, bank statements, and this summary for 6 years in case of audit.</span>
+      </div>
+    </li>
+  </ul>
+</div>
+
+<p class="note">This tool provides estimates for preparation purposes. Consult an accountant for complex situations. All data is stored locally on your computer.</p>
+
+<div class="nav">
+  <a href="/" class="btn btn-outline">Back to Dashboard</a>
+  <a href="/wizard?step=6" class="btn btn-outline">&larr; Back</a>
+</div>
+{% endif %}
+
+</body>
+</html>

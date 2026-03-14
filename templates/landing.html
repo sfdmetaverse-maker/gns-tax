@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gleam &amp; Sip — Tax Filing for Canadian Small Business</title>
+<meta name="description" content="Automated T2 corporate tax and GST/HST returns for Canadian restaurants, cafes, and retail. Import from Toast, Square, GoDaddy. Scan receipts with AI.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold: #92702a;
+  --gold-light: #b8923e;
+  --gold-dark: #6d5420;
+  --gold-muted: rgba(146,112,42,0.08);
+  --gold-glow: rgba(146,112,42,0.12);
+  --cream: #f6f3ee;
+  --cream-dark: #efe9df;
+  --white: #ffffff;
+  --ink: #1c1917;
+  --ink-secondary: #57534e;
+  --ink-tertiary: #a8a29e;
+  --border: #e7e2da;
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ─── Noise texture overlay ─── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ─── NAV ─── */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.4s, box-shadow 0.4s, padding 0.4s;
+}
+
+nav.scrolled {
+  background: rgba(246,243,238,0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 1px 0 var(--border);
+  padding: 0.85rem 2rem;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.nav-logo {
+  width: 36px;
+  height: 36px;
+  background: var(--gold);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(146,112,42,0.25);
+}
+
+.nav-logo svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 1.5; }
+
+.nav-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.nav-links a {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover { color: var(--gold); }
+
+.nav-links .btn-login {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.nav-links .btn-cta {
+  background: var(--gold);
+  color: #fff;
+  padding: 0.55rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.nav-links .btn-cta:hover {
+  background: var(--gold-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(146,112,42,0.3);
+  color: #fff;
+}
+
+/* ─── HERO ─── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8rem 2rem 6rem;
+  position: relative;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140%;
+  height: 80%;
+  background: radial-gradient(ellipse 50% 70% at 50% 30%, rgba(146,112,42,0.07), transparent 70%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 0.4rem 1rem 0.4rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  animation: fadeUp 0.8s ease both;
+}
+
+.hero-badge-dot {
+  width: 8px;
+  height: 8px;
+  background: #4a9e6d;
+  border-radius: 50%;
+  animation: pulse-dot 2s ease infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  max-width: 800px;
+  margin-bottom: 1.5rem;
+  animation: fadeUp 0.8s ease 0.1s both;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.hero-sub {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--ink-secondary);
+  max-width: 520px;
+  margin-bottom: 2.5rem;
+  font-weight: 400;
+  animation: fadeUp 0.8s ease 0.2s both;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  animation: fadeUp 0.8s ease 0.3s both;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--gold);
+  color: #fff;
+  padding: 0.85rem 2rem;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(146,112,42,0.25);
+}
+
+.btn-primary:hover {
+  background: var(--gold-light);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(146,112,42,0.35);
+}
+
+.btn-primary svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-secondary);
+  padding: 0.85rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.btn-ghost:hover { color: var(--gold); }
+
+.hero-proof {
+  margin-top: 4rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  font-size: 0.78rem;
+  color: var(--ink-tertiary);
+  animation: fadeUp 0.8s ease 0.5s both;
+}
+
+.hero-proof-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hero-proof-item strong {
+  color: var(--ink-secondary);
+  font-weight: 600;
+}
+
+.hero-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+}
+
+/* ─── SECTION COMMON ─── */
+section {
+  padding: 7rem 2rem;
+  position: relative;
+}
+
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  max-width: 600px;
+}
+
+.section-sub {
+  font-size: 1.05rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  max-width: 520px;
+  margin-top: 1rem;
+}
+
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+/* ─── LOGOS / INTEGRATIONS ─── */
+.logos {
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 3rem 2rem;
+}
+
+.logos-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5rem;
+  flex-wrap: wrap;
+}
+
+.logos-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  white-space: nowrap;
+}
+
+.logo-item {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink-tertiary);
+  letter-spacing: -0.01em;
+  opacity: 0.5;
+  transition: opacity 0.3s;
+}
+
+.logo-item:hover { opacity: 0.8; }
+
+/* ─── FEATURES ─── */
+.features {
+  background: var(--cream);
+}
+
+.features-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.features-header .section-title,
+.features-header .section-sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.feature-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.06);
+}
+
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--gold-muted);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.feature-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--gold);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.feature-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.feature-card p {
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+}
+
+/* ─── HOW IT WORKS ─── */
+.how-it-works {
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.how-header {
+  text-align: center;
+  margin-bottom: 5rem;
+}
+
+.how-header .section-title,
+.how-header .section-sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3rem;
+  position: relative;
+}
+
+.steps::before {
+  content: '';
+  position: absolute;
+  top: 32px;
+  left: calc(16.67% + 24px);
+  right: calc(16.67% + 24px);
+  height: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+  opacity: 0.2;
+}
+
+.step {
+  text-align: center;
+  position: relative;
+}
+
+.step-number {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.5rem;
+  background: var(--cream);
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--gold);
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s;
+}
+
+.step:hover .step-number {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+  box-shadow: 0 4px 20px rgba(146,112,42,0.3);
+}
+
+.step h3 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.01em;
+}
+
+.step p {
+  font-size: 0.88rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+/* ─── PRICING ─── */
+.pricing {
+  background: var(--cream);
+}
+
+.pricing-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.pricing-header .section-title,
+.pricing-header .section-sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.price-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.price-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.06);
+}
+
+.price-card.featured {
+  border-color: var(--gold);
+  box-shadow: 0 8px 32px rgba(146,112,42,0.12);
+  position: relative;
+}
+
+.price-card.featured::before {
+  content: 'Most Popular';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 1rem;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.price-tier {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  margin-bottom: 0.75rem;
+}
+
+.price-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.price-amount .currency {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+.price-amount .value {
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.price-amount .period {
+  font-size: 0.85rem;
+  color: var(--ink-tertiary);
+}
+
+.price-desc {
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.price-features {
+  list-style: none;
+  margin-bottom: 2rem;
+  flex: 1;
+}
+
+.price-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+}
+
+.price-features li::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  background: var(--gold-muted);
+  border-radius: 50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M5 9l2.5 2.5L13 7' stroke='%2392702a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.price-cta {
+  display: block;
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.price-cta-outline {
+  border: 1.5px solid var(--border);
+  color: var(--ink);
+}
+
+.price-cta-outline:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.price-cta-fill {
+  background: var(--gold);
+  color: #fff;
+  border: 1.5px solid var(--gold);
+}
+
+.price-cta-fill:hover {
+  background: var(--gold-light);
+  border-color: var(--gold-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(146,112,42,0.3);
+}
+
+/* ─── CTA BANNER ─── */
+.cta-banner {
+  background: var(--ink);
+  color: #fff;
+  padding: 6rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(146,112,42,0.15), transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 80%, rgba(146,112,42,0.1), transparent 50%);
+  pointer-events: none;
+}
+
+.cta-banner .section-title {
+  color: #fff;
+  margin: 0 auto 1rem;
+}
+
+.cta-banner .section-sub {
+  color: rgba(255,255,255,0.6);
+  margin: 0 auto 2.5rem;
+}
+
+/* ─── FOOTER ─── */
+footer {
+  background: var(--ink);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 3rem 2rem;
+}
+
+.footer-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.footer-logo {
+  width: 28px;
+  height: 28px;
+  background: var(--gold);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-logo svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 1.5; }
+
+.footer-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+}
+
+.footer-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.footer-links a {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.4);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover { color: rgba(255,255,255,0.7); }
+
+.footer-copy {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.25);
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── MOBILE ─── */
+@media (max-width: 768px) {
+  nav { padding: 1rem; }
+  nav.scrolled { padding: 0.75rem 1rem; }
+
+  .nav-links a:not(.btn-cta):not(.btn-login) { display: none; }
+  .nav-links { gap: 1rem; }
+
+  .hero { padding: 7rem 1.5rem 4rem; min-height: auto; }
+  .hero h1 { font-size: 2.6rem; }
+  .hero-sub { font-size: 1rem; }
+  .hero-proof { flex-direction: column; gap: 0.75rem; }
+  .hero-divider { width: 40px; height: 1px; }
+
+  section { padding: 4rem 1.5rem; }
+
+  .features-grid,
+  .steps,
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .steps::before { display: none; }
+
+  .logos-inner { gap: 2rem; }
+
+  .footer-inner { flex-direction: column; gap: 1.5rem; text-align: center; }
+  .footer-links { flex-wrap: wrap; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .hero h1 { font-size: 2.1rem; }
+  .hero-actions { flex-direction: column; width: 100%; }
+  .btn-primary { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav id="nav">
+  <a href="/" class="nav-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <span class="nav-name">Gleam &amp; Sip</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/login" class="btn-login">Log In</a>
+    <a href="/register" class="btn-cta">Start Free</a>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="hero-badge-dot"></span>
+    Built for Canadian small business
+  </div>
+  <h1>Tax season,<br><em>handled.</em></h1>
+  <p class="hero-sub">
+    Automated T2 corporate tax and GST/HST returns for restaurants, cafes, and&nbsp;retail.
+    Import your POS data, scan receipts, and file&nbsp;with&nbsp;confidence.
+  </p>
+  <div class="hero-actions">
+    <a href="/register" class="btn-primary">
+      Start Free
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+    <a href="#how-it-works" class="btn-ghost">See how it works</a>
+  </div>
+  <div class="hero-proof">
+    <div class="hero-proof-item"><strong>CRA-ready</strong> T2 &amp; GST/HST</div>
+    <div class="hero-divider"></div>
+    <div class="hero-proof-item"><strong>AI-powered</strong> receipt scanning</div>
+    <div class="hero-divider"></div>
+    <div class="hero-proof-item"><strong>5 min</strong> setup</div>
+  </div>
+</section>
+
+<!-- ─── INTEGRATION LOGOS ─── -->
+<div class="logos">
+  <div class="logos-inner">
+    <span class="logos-label">Imports from</span>
+    <span class="logo-item">Toast</span>
+    <span class="logo-item">Square</span>
+    <span class="logo-item">GoDaddy</span>
+    <span class="logo-item">Any Bank CSV</span>
+    <span class="logo-item">Credit Cards</span>
+  </div>
+</div>
+
+<!-- ─── FEATURES ─── -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="features-header reveal">
+      <div class="section-label">Features</div>
+      <h2 class="section-title">Everything you need to file,<br>nothing you don't</h2>
+      <p class="section-sub">Built specifically for Canadian small businesses that run on POS systems and paper receipts.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <h3>Receipt Scanning</h3>
+        <p>Photograph or upload receipts. AI extracts vendor, date, amount, tax, and payment method automatically.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>POS Imports</h3>
+        <p>One-click CSV import from Toast, Square, and GoDaddy. Bank and credit card statements too.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>T2 &amp; GST/HST</h3>
+        <p>Complete corporate tax and GST/HST return calculations. Federal + provincial rates for every province.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3>Smart Categories</h3>
+        <p>Auto-categorizes expenses as they come in. Flag duplicates and missing months before you file.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </div>
+        <h3>Step-by-Step Wizard</h3>
+        <p>A guided workflow walks you through setup, imports, review, and filing. Save progress anytime.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <h3>Telegram Bot</h3>
+        <p>Snap a receipt on your phone and send it to your Telegram bot. It's added to your books instantly.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section class="how-it-works" id="how-it-works">
+  <div class="container">
+    <div class="how-header reveal">
+      <div class="section-label">How It Works</div>
+      <h2 class="section-title">Three steps to tax&nbsp;clarity</h2>
+      <p class="section-sub">Most businesses are set up and seeing their first tax summary in under five minutes.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-number">1</div>
+        <h3>Connect your data</h3>
+        <p>Upload POS exports, bank statements, or snap photos of receipts. We handle Toast, Square, GoDaddy, and any bank CSV.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">2</div>
+        <h3>Review &amp; categorize</h3>
+        <p>AI auto-categorizes your expenses. Review flagged items, resolve duplicates, and verify tax amounts.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">3</div>
+        <h3>File with confidence</h3>
+        <p>Get your complete T2 corporate return and GST/HST filing numbers. Hand them to your accountant or file directly.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRICING ─── -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="pricing-header reveal">
+      <div class="section-label">Pricing</div>
+      <h2 class="section-title">Simple, honest pricing</h2>
+      <p class="section-sub">Start free. Upgrade when you're ready. No surprises.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card reveal">
+        <div class="price-tier">Free</div>
+        <div class="price-amount">
+          <span class="currency">$</span>
+          <span class="value">0</span>
+          <span class="period">/month</span>
+        </div>
+        <p class="price-desc">Perfect for getting started and seeing what's possible.</p>
+        <ul class="price-features">
+          <li>1 user</li>
+          <li>100 transactions/month</li>
+          <li>Receipt scanning (AI)</li>
+          <li>POS &amp; bank import</li>
+          <li>T2 &amp; GST/HST calculations</li>
+        </ul>
+        <a href="/register" class="price-cta price-cta-outline">Get Started</a>
+      </div>
+      <div class="price-card featured reveal">
+        <div class="price-tier">Pro</div>
+        <div class="price-amount">
+          <span class="currency">$</span>
+          <span class="value">29</span>
+          <span class="period">/month</span>
+        </div>
+        <p class="price-desc">For businesses ready to take control of their tax filing.</p>
+        <ul class="price-features">
+          <li>Unlimited users</li>
+          <li>Unlimited transactions</li>
+          <li>Telegram receipt bot</li>
+          <li>Data quality checks</li>
+          <li>Priority support</li>
+          <li>Revenue reconciliation</li>
+        </ul>
+        <a href="/register" class="price-cta price-cta-fill">Start Free Trial</a>
+      </div>
+      <div class="price-card reveal">
+        <div class="price-tier">Enterprise</div>
+        <div class="price-amount">
+          <span class="value" style="font-size:2.5rem;">Custom</span>
+        </div>
+        <p class="price-desc">White-label solution for accounting firms and multi-location businesses.</p>
+        <ul class="price-features">
+          <li>Custom branding</li>
+          <li>Multi-org management</li>
+          <li>Dedicated onboarding</li>
+          <li>API access</li>
+          <li>Custom integrations</li>
+        </ul>
+        <a href="mailto:hello@gleamnsip.com" class="price-cta price-cta-outline">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA BANNER ─── -->
+<section class="cta-banner">
+  <div class="container reveal">
+    <h2 class="section-title">Stop dreading tax season</h2>
+    <p class="section-sub">Join Canadian businesses that file faster, with fewer errors, and zero spreadsheet headaches.</p>
+    <a href="/register" class="btn-primary" style="display:inline-flex;">
+      Start Free Today
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="footer-name">Gleam &amp; Sip</span>
+    </div>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/login">Log In</a>
+      <a href="/register">Sign Up</a>
+    </div>
+    <span class="footer-copy">&copy; 2026 Gleam &amp; Sip. Made in Canada.</span>
+  </div>
+</footer>
+
+<script>
+// Sticky nav
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// Scroll reveal
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) {
+      // Stagger siblings
+      const parent = entry.target.parentElement;
+      const siblings = parent.querySelectorAll('.reveal');
+      let delay = 0;
+      siblings.forEach((sib, idx) => {
+        if (sib === entry.target) delay = idx * 0.08;
+      });
+      entry.target.style.transitionDelay = delay + 's';
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+reveals.forEach(el => observer.observe(el));
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

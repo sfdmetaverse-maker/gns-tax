@@ -1,0 +1,2098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{{ data.business.name }} — Tax Filing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f3ee;
+  --bg-warm: #efe9df;
+  --surface: #ffffff;
+  --surface-raised: #fffdf9;
+  --text: #1c1917;
+  --text-secondary: #78716c;
+  --text-tertiary: #a8a29e;
+  --border: #e7e2da;
+  --border-subtle: #f0ebe3;
+  --accent: {{ branding.primary_color if branding else "#92702a" }};
+  --accent-light: #b8973e;
+  --accent-muted: rgba(146,112,42,0.08);
+  --accent-glow: rgba(146,112,42,0.15);
+  --green: #3d7a4a;
+  --green-bg: #edf5ef;
+  --green-border: #c8dece;
+  --red: #b83a3a;
+  --red-bg: #faf0f0;
+  --red-border: #e8c8c8;
+  --amber: #92702a;
+  --amber-bg: #faf5eb;
+  --amber-border: #e8d9b8;
+  --blue: #3a6b9e;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(28,25,23,0.04);
+  --shadow-md: 0 4px 16px rgba(28,25,23,0.06), 0 1px 3px rgba(28,25,23,0.04);
+  --shadow-lg: 0 8px 32px rgba(28,25,23,0.08), 0 2px 8px rgba(28,25,23,0.04);
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Subtle texture overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container { max-width: 1120px; margin: 0 auto; padding: 2rem 2rem 4rem; position: relative; z-index: 1; }
+
+/* ===== HEADER ===== */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 2rem; margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; gap: 0.75rem;
+}
+.brand { display: flex; align-items: baseline; gap: 0.75rem; }
+.brand-mark {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-family: var(--font-display); font-size: 1.1rem; font-weight: 600;
+  box-shadow: 0 2px 8px rgba(146,112,42,0.25);
+  align-self: center;
+}
+.brand h1 {
+  font-family: var(--font-display); font-size: 1.75rem; font-weight: 600;
+  color: var(--text); letter-spacing: -0.01em;
+}
+.brand-sub {
+  font-size: 0.78rem; color: var(--text-tertiary); letter-spacing: 0.06em;
+  text-transform: uppercase; font-weight: 400;
+}
+.header-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+.year-select {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+  margin-right: 0.5rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.year-select:focus { border-color: var(--accent); }
+.panel-year-bar { display:flex; justify-content:flex-end; margin-bottom:0.75rem; }
+.panel-year-bar .year-select { margin-right:0; }
+
+/* ===== FLASH ===== */
+.flash {
+  background: var(--accent-muted); border: 1px solid var(--amber-border);
+  color: var(--accent); padding: 0.65rem 1rem; border-radius: var(--radius);
+  font-size: 0.82rem; margin-bottom: 1.25rem; font-weight: 400;
+  animation: flash-in 0.3s ease;
+}
+@keyframes flash-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* ===== STATS ROW ===== */
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
+@media (max-width: 768px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 480px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+.stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem 1rem 0.85rem;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.stat-value {
+  font-family: var(--font-mono); font-size: 1.35rem; font-weight: 500;
+  color: var(--text); letter-spacing: -0.02em; line-height: 1.2;
+}
+.stat-value.warn { color: var(--amber); }
+.stat-value.danger { color: var(--red); }
+.stat-value.success { color: var(--green); }
+.stat-label {
+  font-size: 0.68rem; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.35rem;
+  font-weight: 500;
+}
+
+/* ===== WARNINGS PANEL ===== */
+.warnings {
+  background: var(--amber-bg); border: 1px solid var(--amber-border);
+  border-radius: var(--radius-lg); padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.warnings-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.82rem; font-weight: 600; color: var(--amber);
+  margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.warnings-header svg { width: 16px; height: 16px; }
+.warning-section { margin-bottom: 0.85rem; }
+.warning-section:last-child { margin-bottom: 0; }
+.warning-title { font-size: 0.82rem; font-weight: 600; color: var(--text); margin-bottom: 0.35rem; }
+.warning-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.35rem; }
+.warning-badge {
+  background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border);
+  padding: 0.15rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 500;
+}
+.warning-note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
+.warning-success { color: var(--green); font-size: 0.82rem; font-weight: 500; }
+
+/* ===== TABS ===== */
+.tabs {
+  display: flex; gap: 0.15rem; margin-bottom: 0;
+  border-bottom: 1px solid var(--border); position: relative;
+}
+.tab {
+  padding: 0.7rem 1.1rem; cursor: pointer; border: none; background: none;
+  font-family: var(--font-body); font-size: 0.8rem; font-weight: 400;
+  color: var(--text-tertiary); position: relative; transition: color 0.2s;
+  white-space: nowrap;
+}
+.tab::after {
+  content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+  height: 2px; background: transparent; transition: background 0.2s;
+}
+.tab:hover { color: var(--text-secondary); }
+.tab.active { color: var(--accent); font-weight: 500; }
+.tab.active::after { background: var(--accent); }
+.tab .badge {
+  background: var(--red); color: #fff; font-size: 0.6rem; font-weight: 600;
+  padding: 0.1rem 0.4rem; border-radius: 8px; margin-left: 0.35rem;
+  vertical-align: middle; letter-spacing: 0;
+}
+
+/* ===== PANELS ===== */
+.panel { display: none; padding-top: 1.5rem; animation: panel-in 0.25s ease; }
+.panel.active { display: block; }
+@keyframes panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 1.5rem;
+  margin-bottom: 1rem; box-shadow: var(--shadow-sm);
+}
+.card-header {
+  font-family: var(--font-display); font-size: 1.1rem; font-weight: 600;
+  color: var(--text); margin-bottom: 1rem; padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-header .card-count {
+  font-family: var(--font-mono); font-size: 0.72rem;
+  color: var(--text-tertiary); font-weight: 400;
+}
+
+/* ===== FORMS ===== */
+.field { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.65rem; }
+.field label {
+  flex: 1; font-size: 0.82rem; color: var(--text-secondary); font-weight: 400;
+}
+.field input, .field select {
+  width: 220px; padding: 0.5rem 0.7rem; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 0.82rem; font-family: var(--font-body);
+  background: var(--surface-raised); color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: right;
+}
+.field input:focus, .field select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+.field select { text-align: left; }
+.field input[type="text"], .field input[type="date"] { text-align: left; }
+.field-check { justify-content: flex-start; }
+.field-check input { width: auto; accent-color: var(--accent); }
+.field-check label { flex: none; font-size: 0.82rem; }
+
+/* ===== RECEIPT FORM ===== */
+.receipt-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem; align-items: end;
+}
+.fg { display: flex; flex-direction: column; gap: 0.25rem; }
+.fg label {
+  font-size: 0.68rem; color: var(--text-tertiary); text-transform: uppercase;
+  letter-spacing: 0.06em; font-weight: 500;
+}
+.fg input, .fg select {
+  padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.82rem; font-family: var(--font-body);
+  background: var(--surface-raised); color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.fg input:focus, .fg select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+.fg input[type="number"] { text-align: right; font-family: var(--font-mono); font-size: 0.82rem; }
+
+/* ===== UPLOAD ZONE ===== */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius-lg);
+  padding: 2rem 1.5rem; text-align: center; transition: all 0.2s;
+  background: var(--surface-raised); cursor: pointer;
+}
+.upload-zone:hover { border-color: var(--accent); background: var(--accent-muted); }
+.upload-zone.dragover { border-color: var(--accent); background: var(--accent-glow); }
+.upload-icon {
+  width: 48px; height: 48px; margin: 0 auto 0.75rem;
+  border-radius: 12px; background: var(--accent-muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.upload-icon svg { width: 24px; height: 24px; color: var(--accent); }
+.upload-title { font-size: 0.9rem; font-weight: 500; color: var(--text); margin-bottom: 0.25rem; }
+.upload-sub { font-size: 0.78rem; color: var(--text-tertiary); margin-bottom: 0.75rem; }
+.upload-zone input[type="file"] {
+  font-size: 0.8rem; color: var(--text-secondary);
+  font-family: var(--font-body);
+}
+
+/* ===== TABLE ===== */
+.txn-table { width: 100%; border-collapse: collapse; }
+.txn-table th {
+  text-align: left; padding: 0.6rem 0.5rem; font-size: 0.65rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary);
+  font-weight: 500; border-bottom: 1px solid var(--border);
+}
+.txn-table td {
+  padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.8rem; color: var(--text);
+}
+.txn-table tbody tr { transition: background 0.1s; }
+.txn-table tbody tr:hover { background: var(--accent-muted); }
+.txn-table .mono {
+  font-family: var(--font-mono); font-size: 0.78rem;
+  text-align: right; white-space: nowrap;
+}
+.txn-table .mono.expense { color: var(--red); }
+.txn-table .mono.income { color: var(--green); }
+.txn-table .src-tag {
+  display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px;
+  font-size: 0.68rem; font-weight: 500; background: var(--bg-warm);
+  color: var(--text-secondary);
+}
+.txn-table select {
+  font-size: 0.76rem; padding: 0.25rem 0.35rem; border: 1px solid var(--border);
+  border-radius: 6px; font-family: var(--font-body); background: var(--surface);
+  color: var(--text); max-width: 160px;
+}
+.del-btn {
+  background: none; border: 1px solid transparent; color: var(--text-tertiary);
+  cursor: pointer; font-size: 0.75rem; padding: 0.2rem 0.45rem; border-radius: 4px;
+  transition: all 0.15s;
+}
+.del-btn:hover { color: var(--red); border-color: var(--red-border); background: var(--red-bg); }
+.link-btn {
+  background: none; border: 1px solid transparent; color: var(--text-tertiary);
+  cursor: pointer; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 4px;
+  transition: all 0.15s; font-family: var(--font-body);
+}
+.link-btn:hover { color: var(--accent); border-color: var(--accent); }
+.link-btn.unlink { color: var(--accent); }
+.link-btn.unlink:hover { color: var(--red); border-color: var(--red-border); }
+.expand-btn {
+  display: inline-block; font-size: 0.6rem; padding: 2px 7px; border-radius: 8px;
+  background: #e8eaf6; color: #3949ab; font-weight: 600; margin-left: 4px;
+  vertical-align: middle; cursor: pointer; border: 1px solid #c5cae9;
+  font-family: var(--font-body); transition: all 0.15s;
+}
+.expand-btn:hover { background: #c5cae9; }
+.expand-btn.expanded { background: #3949ab; color: #fff; }
+.linked-child-row { background: #f8f7f4; }
+.linked-child-row td { border-left: 3px solid #c5cae9; opacity: 0.7; font-size: 0.8rem; }
+.linked-child-row td:first-child { border-left: 3px solid #3949ab; }
+.link-badge {
+  display: inline-block; font-size: 0.58rem; padding: 1px 5px; border-radius: 8px;
+  background: #e8eaf6; color: #3949ab; font-weight: 600; vertical-align: middle;
+}
+.link-mode-row { outline: 2px solid var(--accent); outline-offset: -2px; }
+.link-select-banner {
+  position: sticky; top: 0; z-index: 50; background: var(--accent); color: #fff;
+  padding: 0.6rem 1rem; border-radius: 8px; margin-bottom: 0.75rem; font-size: 0.85rem;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.link-select-banner button {
+  background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+  color: #fff; padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer;
+  font-family: var(--font-body); font-size: 0.8rem;
+}
+
+/* ===== FILTER BAR ===== */
+.filter-bar {
+  display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;
+}
+.filter-bar label {
+  font-size: 0.72rem; color: var(--text-tertiary); text-transform: uppercase;
+  letter-spacing: 0.06em; font-weight: 500;
+}
+.filter-bar select, .filter-bar input {
+  padding: 0.35rem 0.55rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.78rem; font-family: var(--font-body); background: var(--surface);
+  color: var(--text);
+}
+.filter-bar input { width: 180px; }
+
+/* ===== SUMMARY ROWS ===== */
+.summary-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 0.4rem 0; font-size: 0.84rem;
+}
+.summary-row .label { color: var(--text-secondary); }
+.summary-row .value {
+  font-family: var(--font-mono); font-size: 0.84rem; color: var(--text);
+  letter-spacing: -0.01em;
+}
+.summary-row.subtotal {
+  font-weight: 600; border-top: 1px solid var(--border-subtle);
+  padding-top: 0.55rem; margin-top: 0.25rem;
+}
+.summary-row.subtotal .label, .summary-row.subtotal .value { color: var(--text); }
+.summary-row.total {
+  font-weight: 600; border-top: 2px solid var(--text);
+  padding-top: 0.6rem; margin-top: 0.3rem; font-size: 0.92rem;
+}
+.summary-row.total .value { font-size: 0.92rem; }
+.value-neg { color: var(--red) !important; }
+.value-pos { color: var(--green) !important; }
+
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 640px) { .summary-grid { grid-template-columns: 1fr; } }
+
+/* ===== RESULT BOX ===== */
+.result-box {
+  text-align: center; padding: 1.5rem; border-radius: var(--radius-lg); margin-top: 1.25rem;
+}
+.result-box.owing { background: var(--red-bg); border: 1px solid var(--red-border); }
+.result-box.refund { background: var(--green-bg); border: 1px solid var(--green-border); }
+.result-label {
+  font-size: 0.68rem; color: var(--text-tertiary); text-transform: uppercase;
+  letter-spacing: 0.1em; font-weight: 500; margin-bottom: 0.25rem;
+}
+.result-value {
+  font-family: var(--font-display); font-size: 2rem; font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.result-box.owing .result-value { color: var(--red); }
+.result-box.refund .result-value { color: var(--green); }
+
+/* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.55rem 1.2rem; border: none; border-radius: 8px;
+  font-size: 0.82rem; font-family: var(--font-body); font-weight: 500;
+  cursor: pointer; transition: all 0.15s; text-decoration: none;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+  color: #fff; box-shadow: 0 2px 8px rgba(146,112,42,0.2);
+}
+.btn-primary:hover { box-shadow: 0 4px 12px rgba(146,112,42,0.3); transform: translateY(-1px); }
+.btn-outline {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: var(--surface); border: 1px solid var(--red-border); color: var(--red); }
+.btn-danger:hover { background: var(--red-bg); }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; }
+.actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; flex-wrap: wrap; }
+
+.note {
+  font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.6rem;
+  line-height: 1.55;
+}
+
+.cat-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+@media (max-width: 640px) { .cat-summary { grid-template-columns: 1fr; } }
+
+/* ===== HOW-TO CARD ===== */
+.how-to p { font-size: 0.8rem; color: var(--text-secondary); line-height: 2; }
+.how-to strong { color: var(--text); font-weight: 500; }
+.how-to hr { border: none; border-top: 1px solid var(--border-subtle); margin: 0.5rem 0; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 840px) {
+  .card > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 640px) {
+  .container { padding: 1rem; }
+  .header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+  .header-actions { flex-wrap: wrap; gap: 0.4rem; width: 100%; }
+  .brand h1 { font-size: 1.25rem; }
+  .brand { gap: 0.5rem; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .receipt-grid { grid-template-columns: 1fr 1fr; }
+  .field input, .field select, .rf input, .rf select, input, select, textarea { font-size: 16px !important; }
+  .field input, .field select { width: 100%; }
+  .review-item { grid-template-columns: 1fr; }
+  .review-image-wrap { height: 240px; }
+}
+.receipt-thumb { width:36px; height:36px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid var(--border); transition:transform 0.15s; }
+.receipt-thumb:hover { transform:scale(1.1); }
+
+/* ===== REVIEW SIDE-BY-SIDE ===== */
+.review-list { display:flex; flex-direction:column; gap:1rem; }
+.review-item {
+  display:grid; grid-template-columns:280px 1fr; gap:1.25rem;
+  border:1px solid var(--border); border-radius:var(--radius);
+  padding:1rem; background:var(--bg); transition:box-shadow 0.2s;
+}
+.review-item.checked { border-color:#4a9e6d; background:rgba(74,158,109,0.03); }
+.review-item:hover { box-shadow:var(--shadow-md); }
+.review-image-wrap {
+  position:relative; height:340px; overflow:hidden; border:1px solid var(--border);
+  border-radius:6px; background:#fafafa; cursor:grab;
+}
+.review-image-wrap:active { cursor:grabbing; }
+.review-image-wrap img {
+  position:absolute; top:0; left:0;
+  width:100%; height:100%; object-fit:contain;
+  user-select:none; -webkit-user-drag:none;
+  transform-origin:center center;
+  transition:none;
+}
+.zoom-controls {
+  position:absolute; top:6px; right:6px; display:flex; gap:4px; z-index:2;
+}
+.zoom-btn {
+  width:28px; height:28px; border-radius:6px; border:1px solid var(--border);
+  background:rgba(255,255,255,0.9); cursor:pointer; font-size:1rem; line-height:1;
+  display:flex; align-items:center; justify-content:center; color:var(--text);
+  box-shadow:var(--shadow-sm); backdrop-filter:blur(4px);
+}
+.zoom-btn:hover { background:#fff; border-color:var(--accent); }
+.review-image .no-image {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:120px; color:var(--text-tertiary); gap:0.25rem; font-size:0.75rem;
+}
+.review-fields {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem;
+}
+.rf label { display:block; font-size:0.7rem; color:var(--text-tertiary); margin-bottom:2px; text-transform:uppercase; letter-spacing:0.04em; }
+.rf input, .rf select { width:100%; padding:0.35rem 0.5rem; border:1px solid var(--border); border-radius:5px; font-size:0.85rem; font-family:var(--font-body); }
+.rf input:focus, .rf select:focus { border-color:var(--accent); outline:none; box-shadow:0 0 0 2px rgba(146,112,42,0.15); }
+.status-btn {
+  padding:0.35rem 0.85rem; border-radius:20px; font-size:0.75rem; font-weight:600;
+  cursor:pointer; border:1.5px solid; transition:all 0.2s; text-transform:uppercase; letter-spacing:0.03em;
+}
+.status-btn.pending { background:#fff3e0; color:#b8860b; border-color:#daa520; }
+.status-btn.checked-status { background:#e8f5e9; color:#2e7d32; border-color:#4a9e6d; }
+.linked-thumbs {
+  margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
+}
+.linked-thumbs-label {
+  font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #3949ab; margin-bottom: 0.5rem;
+}
+.linked-thumb-item {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;
+  padding: 0.35rem; background: var(--bg); border-radius: 6px; border: 1px solid var(--border);
+}
+.linked-thumb-item img {
+  width: 48px; height: 48px; object-fit: cover; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.linked-thumb-item img:hover { border-color: var(--accent); }
+.linked-thumb-placeholder {
+  width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border-radius: 4px; font-size: 0.6rem; color: var(--text-tertiary);
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.linked-thumb-info { display: flex; flex-direction: column; min-width: 0; }
+.linked-thumb-desc {
+  font-size: 0.78rem; font-weight: 500; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.linked-thumb-meta { font-size: 0.68rem; color: var(--text-tertiary); }
+.review-panel { margin-top:-1px; }
+.review-panel .review-item { border-top:2px solid var(--accent); border-radius:0 0 var(--radius) var(--radius); }
+.txn-row.active-row { background:var(--accent-muted) !important; }
+@media (max-width: 640px) {
+  .review-item { grid-template-columns:1fr; }
+  .review-image-wrap { height:220px; }
+  .review-fields { grid-template-columns:1fr 1fr; }
+}
+.lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center; cursor:pointer; }
+.lightbox.active { display:flex; }
+.lightbox img { max-width:90vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,0.5); }
+.lightbox .close-lb { position:absolute; top:1rem; right:1.5rem; color:#fff; font-size:2rem; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ===== HEADER ===== -->
+<div class="header">
+  <div class="brand">
+    <div class="brand-mark">G</div>
+    <div>
+      <h1>{{ data.business.name }}</h1>
+      <div class="brand-sub">Tax &amp; GST</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <a href="/wizard" class="btn btn-outline btn-sm">Step-by-Step Guide</a>
+    {% if user %}
+    {% if user.is_superadmin %}
+    <a href="/admin/" class="btn btn-outline btn-sm" style="font-size:0.72rem;">Admin</a>
+    {% endif %}
+    <span style="font-size:0.78rem; color:var(--text-tertiary);">{{ user.email }}</span>
+    <a href="/logout" class="btn btn-outline btn-sm" style="font-size:0.72rem;">Logout</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== FLASH MESSAGES ===== -->
+{% with messages = get_flashed_messages() %}
+{% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+{% endwith %}
+
+<!-- ===== DASHBOARD STATS ===== -->
+<div class="stats">
+  <div class="stat" style="cursor:pointer;" onclick="showTab('pending')">
+    <div class="stat-value {{ 'warn' if pending_count > 0 }}">{{ pending_count }}</div>
+    <div class="stat-label">Need Review</div>
+  </div>
+</div>
+
+<!-- ===== TABS ===== -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('add')">Add</button>
+  <button class="tab" onclick="showTab('pending')">Pending Review{% if pending_count > 0 %}<span class="badge">{{ pending_count }}</span>{% endif %}</button>
+  <button class="tab" onclick="showTab('matching')">Matching{% if match_count > 0 %}<span class="badge">{{ match_count }}</span>{% endif %}</button>
+  <button class="tab" onclick="showTab('bank')">Bank</button>
+  <button class="tab" onclick="showTab('creditcard')">Credit Card</button>
+  <button class="tab" onclick="showTab('transactions')">Receipts</button>
+  <button class="tab" onclick="showTab('t2')">T2 Summary</button>
+  <button class="tab" onclick="showTab('gst')">GST/HST</button>
+  <button class="tab" onclick="showTab('quality')">Data Quality{% if warnings %}{% set issue_count = (warnings.missing_months|length if warnings.missing_months else 0) + (warnings.duplicates|length if warnings.duplicates else 0) + (1 if warnings.hst_gaps else 0) + (1 if warnings.no_revenue else 0) + (1 if warnings.no_expenses else 0) + (1 if warnings.revenue_recon else 0) + (warnings.expected_categories|length if warnings.expected_categories else 0) %}{% if issue_count > 0 %}<span class="badge">{{ issue_count }}</span>{% endif %}{% endif %}</button>
+  <button class="tab" onclick="showTab('settings')">Settings</button>
+</div>
+
+<!-- ============================================ ADD ===== -->
+<div id="panel-add" class="panel active">
+
+  <div class="card">
+    <div class="card-header">Scan Receipts</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <!-- Take Photo (mobile) -->
+      <form method="post" action="/upload-receipts" enctype="multipart/form-data">
+        <div class="upload-zone" style="cursor:pointer; position:relative;" onclick="this.querySelector('input').click()">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </div>
+          <div class="upload-title">Take Photo</div>
+          <div class="upload-sub">Open camera on your phone</div>
+          <input type="file" name="receipt_files" accept="image/*" capture="environment" style="position:absolute;opacity:0;width:100%;height:100%;top:0;left:0;cursor:pointer;">
+          <button type="submit" class="btn btn-primary" style="margin-top:0.75rem;">Upload &amp; OCR</button>
+        </div>
+      </form>
+      <!-- Bulk upload (desktop / multi-file) -->
+      <form method="post" action="/upload-receipts" enctype="multipart/form-data">
+        <div class="upload-zone" id="drop-zone">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="upload-title">Upload Files</div>
+          <div class="upload-sub">PNG, JPG, PDF &mdash; select multiple</div>
+          <input type="file" name="receipt_files" accept="image/*,.pdf" multiple>
+          <button type="submit" class="btn btn-primary" style="margin-top:0.75rem;">Upload &amp; OCR</button>
+        </div>
+      </form>
+    </div>
+    <p class="note">OCR extracts vendor, date, amount, and tax. Review results and fix any errors.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Import Statements</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <!-- Bank / Credit Card -->
+      <form method="post" action="/import-csv" enctype="multipart/form-data">
+        <div class="upload-zone">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          </div>
+          <div class="upload-title">Bank / Credit Card</div>
+          <div class="upload-sub">PDF or CSV statement</div>
+          <div style="display:flex; justify-content:center; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+            <select name="csv_source" style="padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:6px; font-size:0.8rem; font-family:var(--font-body);">
+              <option value="Bank">Bank Account</option>
+              <option value="Credit Card">Credit Card</option>
+            </select>
+          </div>
+          <input type="file" name="csv_file" accept=".csv,.CSV,.pdf,.PDF">
+          <button type="submit" class="btn btn-primary" style="margin-top:0.75rem;">Import</button>
+        </div>
+      </form>
+      <!-- POS -->
+      <form method="post" action="/import-csv" enctype="multipart/form-data">
+        <div class="upload-zone">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <div class="upload-title">POS Export</div>
+          <div class="upload-sub">Toast, Square, GoDaddy CSV</div>
+          <div style="display:flex; justify-content:center; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+            <select name="csv_source" style="padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:6px; font-size:0.8rem; font-family:var(--font-body);">
+              <option value="Toast">Toast POS</option>
+              <option value="Square">Square POS</option>
+              <option value="GoDaddy">GoDaddy</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <input type="file" name="csv_file" accept=".csv,.CSV">
+          <button type="submit" class="btn btn-primary" style="margin-top:0.75rem;">Import</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Manual Entry</div>
+    <form method="post" action="/receipt">
+      <div class="receipt-grid">
+        <div class="fg">
+          <label>Date</label>
+          <input type="date" name="r_date" value="{{ today }}" required>
+        </div>
+        <div class="fg" style="grid-column: span 2;">
+          <label>Vendor / Description</label>
+          <input type="text" name="r_desc" placeholder="e.g. Staples - paper" required>
+        </div>
+        <div class="fg">
+          <label>Amount (pre-tax)</label>
+          <input type="number" step="0.01" name="r_amount" placeholder="0.00" required>
+        </div>
+        <div class="fg">
+          <label>HST/GST</label>
+          <input type="number" step="0.01" name="r_tax" value="0" placeholder="0.00">
+        </div>
+        <div class="fg">
+          <label>Type</label>
+          <select name="r_type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Category</label>
+          <select name="r_category">
+            <optgroup label="Revenue">
+              {% for k in ["sales", "other_income"] %}
+              <option value="{{ k }}">{{ categories[k] }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="COGS">
+              <option value="purchases" selected>{{ categories["purchases"] }}</option>
+            </optgroup>
+            <optgroup label="Expenses">
+              {% for k in ["wages","rent","utilities","insurance","office_supplies","professional_fees","advertising","travel","meals_entertainment","interest","other"] %}
+              <option value="{{ k }}">{{ categories[k] }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Other">
+              {% for k in ["transfer", "owner_draw", "skip"] %}
+              <option value="{{ k }}">{{ categories[k] }}</option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <div class="fg">
+          <label>&nbsp;</label>
+          <button type="submit" class="btn btn-primary" style="width:100%;">Add</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<!-- ============================================ PENDING REVIEW ===== -->
+<div id="panel-pending" class="panel">
+  {% if pending_txns %}
+  <form method="post" action="/bulk-update">
+    <input type="hidden" name="year" value="{{ selected_year or '' }}">
+    <div class="card">
+      <div class="card-header">Pending Review <span class="card-count">{{ pending_count }} items</span></div>
+
+      <div class="filter-bar">
+        <label>Filter</label>
+        <select id="pending-filter-source" onchange="filterPendingTxns()">
+          <option value="">All sources</option>
+          {% for s in sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <select id="pending-filter-cat" onchange="filterPendingTxns()">
+          <option value="">All categories</option>
+          <option value="other">Uncategorized</option>
+          {% for k, v in categories.items() if k != "other" %}
+          <option value="{{ k }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" id="pending-filter-search" placeholder="Search descriptions..." oninput="filterPendingTxns()">
+      </div>
+
+      <div style="overflow-x:auto;">
+      <table class="txn-table" id="pending-table">
+        <thead>
+          <tr><th></th><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Tax</th><th>Source</th><th>Category</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for t in pending_txns %}
+        {% set children = pending_linked_children.get(t.id, []) %}
+        <tr data-source="{{ t.source }}" data-cat="{{ t.category }}" data-desc="{{ t.description|lower }}" data-id="{{ t.id }}" class="txn-row" onclick="toggleReview('{{ t.id }}')" style="cursor:pointer;">
+          <td>{% if t.ocr_file %}<img src="/uploads/{{ t.ocr_file }}" class="receipt-thumb" alt="Receipt">{% endif %}</td>
+          <td style="white-space:nowrap;">{{ t.date }}</td>
+          <td>{{ t.description }}</td>
+          <td class="mono {{ 'expense' if t.amount < 0 else 'income' }}">${{ "{:,.2f}".format(t.amount|abs) }}</td>
+          <td class="mono">${{ "{:,.2f}".format(t.tax|abs) }}</td>
+          <td><span class="src-tag">{{ t.source }}</span></td>
+          <td>
+            <select name="cat_{{ t.id }}" onclick="event.stopPropagation();">
+              {% for k, v in categories.items() %}
+              <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td style="white-space:nowrap;">
+            <button type="button" class="del-btn" onclick="event.stopPropagation(); deleteTxn('{{ t.id }}')" title="Delete">&times;</button>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Save All Categories</button>
+      </div>
+    </div>
+  </form>
+
+  {% for t in pending_txns %}
+  {% set children = pending_linked_children.get(t.id, []) %}
+  <div class="review-panel" id="review-panel-{{ t.id }}" style="display:none;">
+    <div class="review-item" id="review-{{ t.id }}">
+      <div class="review-image">
+        {% if t.ocr_file %}
+        <div class="review-image-wrap" id="imgwrap-{{ t.id }}"{% if t.ocr_bbox %} data-bbox="{{ t.ocr_bbox }}"{% endif %}>
+          <div class="zoom-controls">
+            <button type="button" class="zoom-btn" onclick="zoomImg('imgwrap-{{ t.id }}', 1)" title="Zoom in">+</button>
+            <button type="button" class="zoom-btn" onclick="zoomImg('imgwrap-{{ t.id }}', -1)" title="Zoom out">&minus;</button>
+            <button type="button" class="zoom-btn" onclick="zoomImg('imgwrap-{{ t.id }}', 0)" title="Reset">&#8634;</button>
+          </div>
+          <img src="/uploads/{{ t.ocr_file }}" alt="Receipt" draggable="false">
+        </div>
+        {% else %}
+        <div class="no-image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="32" height="32"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          <span>No image</span>
+        </div>
+        {% endif %}
+        {% if children %}
+        <div class="linked-thumbs">
+          <div class="linked-thumbs-label">Linked Documents ({{ children|length }})</div>
+          {% for c in children %}
+          <div class="linked-thumb-item">
+            {% if c.ocr_file %}
+            <img src="/uploads/{{ c.ocr_file }}" alt="Linked receipt" onclick="viewReceipt('/uploads/{{ c.ocr_file }}')">
+            {% else %}
+            <div class="linked-thumb-placeholder">No image</div>
+            {% endif %}
+            <div class="linked-thumb-info">
+              <span class="linked-thumb-desc">{{ c.description[:40] }}</span>
+              <span class="linked-thumb-meta">{{ c.date }} &middot; ${{ "{:,.2f}".format(c.amount|abs) }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="review-form">
+        <form method="post" action="/update-txn">
+          <input type="hidden" name="txn_id" value="{{ t.id }}">
+          <input type="hidden" name="redirect" value="{{ url_for('dashboard', year=selected_year) }}#pending">
+          <input type="hidden" name="reviewed" value="false" id="reviewed-{{ t.id }}">
+          <div class="review-fields">
+            <div class="rf" style="grid-column: span 2;">
+              <label>Store Name</label>
+              <input type="text" name="store_name" value="{{ t.store_name|default('', true) }}">
+            </div>
+            <div class="rf">
+              <label>Date</label>
+              <input type="date" name="date" value="{{ t.date }}">
+            </div>
+            <div class="rf" style="grid-column: span 3;">
+              <label>Address</label>
+              <input type="text" name="store_address" value="{{ t.store_address|default('', true) }}" placeholder="123 Main St, City, ON">
+            </div>
+            <div class="rf" style="grid-column: span 3;">
+              <label>Description</label>
+              <input type="text" name="description" value="{{ t.description }}">
+            </div>
+            <div class="rf">
+              <label>Subtotal</label>
+              <input type="number" step="0.01" name="amount" value="{{ t.amount|abs }}" id="amt-{{ t.id }}" oninput="calcTotal('{{ t.id }}')">
+            </div>
+            <div class="rf">
+              <label>HST/GST</label>
+              <input type="number" step="0.01" name="tax" value="{{ t.tax|abs }}" id="tax-{{ t.id }}" oninput="calcTotal('{{ t.id }}')">
+            </div>
+            <div class="rf">
+              <label>Total</label>
+              <input type="text" id="total-{{ t.id }}" value="${{ '{:,.2f}'.format(t.amount|abs + t.tax|abs) }}" readonly style="background:var(--bg); font-weight:600; color:var(--accent);">
+            </div>
+            <div class="rf" style="grid-column: span 2;">
+              <label>Card Info</label>
+              <input type="text" name="card_info" value="{{ t.card_info|default('', true) }}" placeholder="Visa *1234">
+            </div>
+            <div class="rf">
+              <label>Category</label>
+              <select name="category">
+                {% for k, v in categories.items() %}
+                <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.75rem; margin-top:0.5rem;">
+            <button type="submit" class="btn btn-primary" style="padding:0.4rem 1rem; font-size:0.8rem;">Save</button>
+            <button type="button" class="status-btn pending" onclick="toggleReviewed('{{ t.id }}', this)">
+              Pending
+            </button>
+            <span class="src-tag">{{ t.source }}</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="card" style="text-align:center; padding:3rem;">
+    <div style="color:var(--text-tertiary); font-size:0.9rem;">No pending items. All transactions have been reviewed!</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ============================================ BANK ===== -->
+<div id="panel-bank" class="panel">
+  <div class="panel-year-bar">
+    {% if available_years and available_years|length > 0 %}
+    <select class="year-select" onchange="changeYear(this.value)">
+      {% for yr in available_years %}
+      <option value="{{ yr }}" {{ 'selected' if yr == selected_year else '' }}>{{ yr }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+  {% if bank_statements %}
+  {% for stmt in bank_statements %}
+  <div class="card stmt-card" style="margin-bottom:0.75rem;">
+    <div class="stmt-header" onclick="toggleStmt(this)" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.75rem;">
+      <div>
+        <span style="font-weight:600; font-size:0.88rem;">{{ stmt.label }}</span>
+        <span class="card-count">{{ stmt.count }} entries</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <span class="mono" style="font-size:0.78rem;">
+          <span class="expense">${{ "{:,.2f}".format(stmt.total_debit) }}</span> out
+          &middot;
+          <span class="income">${{ "{:,.2f}".format(stmt.total_credit) }}</span> in
+        </span>
+        {% if stmt.ocr_file %}
+        <a href="/uploads/{{ stmt.ocr_file }}" target="_blank" onclick="event.stopPropagation();" style="font-size:0.72rem; color:var(--accent); text-decoration:none;" title="View uploaded statement">View PDF</a>
+        {% endif %}
+        <span class="stmt-arrow" style="font-size:0.7rem; color:var(--text-tertiary); transition:transform 0.2s;">&#9654;</span>
+      </div>
+    </div>
+    <div class="stmt-body" style="display:none; border-top:1px solid var(--border);">
+      <div style="overflow-x:auto;">
+      <table class="txn-table" style="margin:0;">
+        <thead>
+          <tr><th>Date</th><th>Description</th><th style="text-align:right;">Debit</th><th style="text-align:right;">Credit</th><th>Category</th></tr>
+        </thead>
+        <tbody>
+        {% for t in stmt.txns %}
+        <tr>
+          <td style="white-space:nowrap;">{{ t.date }}</td>
+          <td>{{ t.description }}</td>
+          <td class="mono expense" style="text-align:right;">{% if t.amount < 0 %}${{ "{:,.2f}".format(t.amount|abs) }}{% endif %}</td>
+          <td class="mono income" style="text-align:right;">{% if t.amount > 0 %}${{ "{:,.2f}".format(t.amount) }}{% endif %}</td>
+          <td>
+            <form method="post" action="/bulk-update" style="margin:0;">
+              <input type="hidden" name="year" value="{{ selected_year or '' }}">
+              <select name="cat_{{ t.id }}" onchange="this.form.submit();" style="font-size:0.75rem;">
+                {% for k, v in categories.items() %}
+                <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="card" style="text-align:center; padding:3rem;">
+    <div style="color:var(--text-tertiary); font-size:0.9rem;">No bank transactions for {{ selected_year }}.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ============================================ CREDIT CARD ===== -->
+<div id="panel-creditcard" class="panel">
+  <div class="panel-year-bar">
+    {% if available_years and available_years|length > 0 %}
+    <select class="year-select" onchange="changeYear(this.value)">
+      {% for yr in available_years %}
+      <option value="{{ yr }}" {{ 'selected' if yr == selected_year else '' }}>{{ yr }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+  {% if cc_statements %}
+  {% for stmt in cc_statements %}
+  <div class="card stmt-card" style="margin-bottom:0.75rem;">
+    <div class="stmt-header" onclick="toggleStmt(this)" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.75rem;">
+      <div>
+        <span style="font-weight:600; font-size:0.88rem;">{{ stmt.label }}</span>
+        <span class="card-count">{{ stmt.count }} entries</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <span class="mono" style="font-size:0.78rem;">
+          ${{ "{:,.2f}".format(stmt.total_debit) }} charged
+        </span>
+        {% if stmt.ocr_file %}
+        <a href="/uploads/{{ stmt.ocr_file }}" target="_blank" onclick="event.stopPropagation();" style="font-size:0.72rem; color:var(--accent); text-decoration:none;" title="View uploaded statement">View PDF</a>
+        {% endif %}
+        <span class="stmt-arrow" style="font-size:0.7rem; color:var(--text-tertiary); transition:transform 0.2s;">&#9654;</span>
+      </div>
+    </div>
+    <div class="stmt-body" style="display:none; border-top:1px solid var(--border);">
+      <div style="overflow-x:auto;">
+      <table class="txn-table" style="margin:0;">
+        <thead>
+          <tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Matched</th><th>Category</th></tr>
+        </thead>
+        <tbody>
+        {% for t in stmt.txns %}
+        <tr>
+          <td style="white-space:nowrap;">{{ t.date }}</td>
+          <td>{{ t.description }}</td>
+          <td class="mono {{ 'income' if t.amount > 0 else 'expense' }}" style="text-align:right;">${{ "{:,.2f}".format(t.amount|abs) }}</td>
+          <td>{% if t.match_group %}<span style="color:var(--green); font-size:0.75rem;">Matched</span>{% else %}<span style="color:var(--text-tertiary); font-size:0.75rem;">--</span>{% endif %}</td>
+          <td>
+            <form method="post" action="/bulk-update" style="margin:0;">
+              <input type="hidden" name="year" value="{{ selected_year or '' }}">
+              <select name="cat_{{ t.id }}" onchange="this.form.submit();" style="font-size:0.75rem;">
+                {% for k, v in categories.items() %}
+                <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="card" style="text-align:center; padding:3rem;">
+    <div style="color:var(--text-tertiary); font-size:0.9rem;">No credit card transactions for {{ selected_year }}.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ============================================ RECEIPTS ===== -->
+<div id="panel-transactions" class="panel">
+  <div class="panel-year-bar">
+    {% if available_years and available_years|length > 0 %}
+    <select class="year-select" onchange="changeYear(this.value)">
+      {% for yr in available_years %}
+      <option value="{{ yr }}" {{ 'selected' if yr == selected_year else '' }}>{{ yr }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+  {% if checked_txns %}
+  <form method="post" action="/bulk-update">
+    <input type="hidden" name="year" value="{{ selected_year or '' }}">
+    <div class="card">
+      <div class="card-header">Transactions <span class="card-count">{{ checked_txns|length }} checked</span></div>
+
+      <div class="filter-bar">
+        <label>Filter</label>
+        <select id="filter-source" onchange="filterTxns()">
+          <option value="">All sources</option>
+          {% for s in sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <select id="filter-cat" onchange="filterTxns()">
+          <option value="">All categories</option>
+          <option value="other">Uncategorized</option>
+          {% for k, v in categories.items() if k != "other" %}
+          <option value="{{ k }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" id="filter-search" placeholder="Search descriptions..." oninput="filterTxns()">
+      </div>
+
+      <div style="overflow-x:auto;">
+      <table class="txn-table" id="txn-table">
+        <thead>
+          <tr><th></th><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Tax</th><th>Source</th><th>Category</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for t in checked_txns %}
+        {% set children = linked_children.get(t.id, []) %}
+        <tr data-source="{{ t.source }}" data-cat="{{ t.category }}" data-desc="{{ t.description|lower }}" data-id="{{ t.id }}" class="txn-row" onclick="toggleReview('{{ t.id }}')" style="cursor:pointer;">
+          <td>
+            {% if t.ocr_file %}<img src="/uploads/{{ t.ocr_file }}" class="receipt-thumb" alt="Receipt">{% endif %}
+            {% if children %}
+            <button type="button" class="expand-btn" onclick="event.stopPropagation(); toggleLinked('{{ t.id }}')" title="Show linked records">
+              {{ children|length }} linked
+            </button>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap;">{{ t.date }}</td>
+          <td>{{ t.description }}</td>
+          <td class="mono {{ 'expense' if t.amount < 0 else 'income' }}">${{ "{:,.2f}".format(t.amount|abs) }}</td>
+          <td class="mono">${{ "{:,.2f}".format(t.tax|abs) }}</td>
+          <td><span class="src-tag">{{ t.source }}</span></td>
+          <td>
+            <select name="cat_{{ t.id }}" onclick="event.stopPropagation();">
+              {% for k, v in categories.items() %}
+              <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td style="white-space:nowrap;">
+            {% if children|length < 5 %}
+            <button type="button" class="link-btn" onclick="event.stopPropagation(); startLink('{{ t.id }}')" title="Link another transaction">Link</button>
+            {% endif %}
+            <button type="button" class="del-btn" onclick="event.stopPropagation(); deleteTxn('{{ t.id }}')" title="Delete">&times;</button>
+          </td>
+        </tr>
+        {% for c in children %}
+        <tr data-source="{{ c.source }}" data-cat="{{ c.category }}" data-desc="{{ c.description|lower }}" data-id="{{ c.id }}" class="txn-row linked-child-row" data-parent="{{ t.id }}" style="display:none;">
+          <td style="padding-left:1.8rem;">
+            <span class="link-badge">Linked</span>
+          </td>
+          <td style="white-space:nowrap;">{{ c.date }}</td>
+          <td>{{ c.description }}</td>
+          <td class="mono {{ 'expense' if c.amount < 0 else 'income' }}">${{ "{:,.2f}".format(c.amount|abs) }}</td>
+          <td class="mono">${{ "{:,.2f}".format(c.tax|abs) }}</td>
+          <td><span class="src-tag">{{ c.source }}</span></td>
+          <td>
+            <select name="cat_{{ c.id }}" onclick="event.stopPropagation();">
+              {% for k, v in categories.items() %}
+              <option value="{{ k }}" {{ "selected" if k == c.category }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td style="white-space:nowrap;">
+            <button type="button" class="link-btn unlink" onclick="event.stopPropagation(); unlinkTxn('{{ c.id }}')" title="Unlink">Unlink</button>
+            <button type="button" class="del-btn" onclick="event.stopPropagation(); deleteTxn('{{ c.id }}')" title="Delete">&times;</button>
+          </td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Save All Categories</button>
+        <button type="button" class="btn btn-danger" onclick="if(confirm('Delete ALL transactions?')) document.getElementById('clear-form').submit();">Clear All</button>
+      </div>
+    </div>
+  </form>
+  {% for t in checked_txns %}
+  {% set children = linked_children.get(t.id, []) %}
+  <div class="review-panel" id="review-panel-{{ t.id }}" style="display:none;">
+    <div class="review-item checked" id="review-{{ t.id }}">
+      <div class="review-image">
+        {% if t.ocr_file %}
+        <div class="review-image-wrap" id="imgwrap-{{ t.id }}"{% if t.ocr_bbox %} data-bbox="{{ t.ocr_bbox }}"{% endif %}>
+          <div class="zoom-controls">
+            <button type="button" class="zoom-btn" onclick="zoomImg('imgwrap-{{ t.id }}', 1)" title="Zoom in">+</button>
+            <button type="button" class="zoom-btn" onclick="zoomImg('imgwrap-{{ t.id }}', -1)" title="Zoom out">&minus;</button>
+            <button type="button" class="zoom-btn" onclick="zoomImg('imgwrap-{{ t.id }}', 0)" title="Reset">&#8634;</button>
+          </div>
+          <img src="/uploads/{{ t.ocr_file }}" alt="Receipt" draggable="false">
+        </div>
+        {% else %}
+        <div class="no-image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="32" height="32"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          <span>No image</span>
+        </div>
+        {% endif %}
+        {% if children %}
+        <div class="linked-thumbs">
+          <div class="linked-thumbs-label">Linked Documents ({{ children|length }})</div>
+          {% for c in children %}
+          <div class="linked-thumb-item">
+            {% if c.ocr_file %}
+            <img src="/uploads/{{ c.ocr_file }}" alt="Linked receipt" onclick="viewReceipt('/uploads/{{ c.ocr_file }}')">
+            {% else %}
+            <div class="linked-thumb-placeholder">No image</div>
+            {% endif %}
+            <div class="linked-thumb-info">
+              <span class="linked-thumb-desc">{{ c.description[:40] }}</span>
+              <span class="linked-thumb-meta">{{ c.date }} &middot; ${{ "{:,.2f}".format(c.amount|abs) }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="review-form">
+        <form method="post" action="/update-txn">
+          <input type="hidden" name="txn_id" value="{{ t.id }}">
+          <input type="hidden" name="redirect" value="{{ url_for('dashboard', year=selected_year) }}#transactions">
+          <input type="hidden" name="reviewed" value="true" id="reviewed-{{ t.id }}">
+          <div class="review-fields">
+            <div class="rf" style="grid-column: span 2;">
+              <label>Store Name</label>
+              <input type="text" name="store_name" value="{{ t.store_name|default('', true) }}">
+            </div>
+            <div class="rf">
+              <label>Date</label>
+              <input type="date" name="date" value="{{ t.date }}">
+            </div>
+            <div class="rf" style="grid-column: span 3;">
+              <label>Address</label>
+              <input type="text" name="store_address" value="{{ t.store_address|default('', true) }}" placeholder="123 Main St, City, ON">
+            </div>
+            <div class="rf" style="grid-column: span 3;">
+              <label>Description</label>
+              <input type="text" name="description" value="{{ t.description }}">
+            </div>
+            <div class="rf">
+              <label>Subtotal</label>
+              <input type="number" step="0.01" name="amount" value="{{ t.amount|abs }}" id="amt-{{ t.id }}" oninput="calcTotal('{{ t.id }}')">
+            </div>
+            <div class="rf">
+              <label>HST/GST</label>
+              <input type="number" step="0.01" name="tax" value="{{ t.tax|abs }}" id="tax-{{ t.id }}" oninput="calcTotal('{{ t.id }}')">
+            </div>
+            <div class="rf">
+              <label>Total</label>
+              <input type="text" id="total-{{ t.id }}" value="${{ '{:,.2f}'.format(t.amount|abs + t.tax|abs) }}" readonly style="background:var(--bg); font-weight:600; color:var(--accent);">
+            </div>
+            <div class="rf" style="grid-column: span 2;">
+              <label>Card Info</label>
+              <input type="text" name="card_info" value="{{ t.card_info|default('', true) }}" placeholder="Visa *1234">
+            </div>
+            <div class="rf">
+              <label>Category</label>
+              <select name="category">
+                {% for k, v in categories.items() %}
+                <option value="{{ k }}" {{ "selected" if k == t.category }}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.75rem; margin-top:0.5rem;">
+            <button type="submit" class="btn btn-primary" style="padding:0.4rem 1rem; font-size:0.8rem;">Save</button>
+            <button type="button" class="status-btn checked-status" onclick="toggleReviewed('{{ t.id }}', this)">
+              Checked
+            </button>
+            <span class="src-tag">{{ t.source }}</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="card" style="text-align:center; padding:3rem;">
+    <div style="color:var(--text-tertiary); font-size:0.9rem;">No checked transactions for {{ selected_year }}.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Hidden utility forms (shared by Pending & Transactions panels) -->
+<form id="clear-form" method="post" action="/clear-txns" style="display:none;">
+  <input type="hidden" name="year" value="{{ selected_year or '' }}">
+</form>
+<form id="del-txn-form" method="post" action="/delete-txn" style="display:none;">
+  <input type="hidden" name="txn_id" id="del-txn-id">
+  <input type="hidden" name="year" value="{{ selected_year or '' }}">
+  <input type="hidden" name="redirect" id="del-txn-redirect" value="">
+</form>
+<form id="link-txn-form" method="post" action="/link-txn" style="display:none;">
+  <input type="hidden" name="txn_id" id="link-txn-id">
+  <input type="hidden" name="link_to" id="link-txn-target">
+  <input type="hidden" name="year" value="{{ selected_year or '' }}">
+</form>
+<form id="unlink-txn-form" method="post" action="/unlink-txn" style="display:none;">
+  <input type="hidden" name="txn_id" id="unlink-txn-id">
+  <input type="hidden" name="year" value="{{ selected_year or '' }}">
+</form>
+
+<!-- ============================================ T2 SUMMARY ===== -->
+<div id="panel-t2" class="panel">
+  <div class="panel-year-bar">
+    {% if available_years and available_years|length > 0 %}
+    <select class="year-select" onchange="changeYear(this.value)">
+      {% for yr in available_years %}
+      <option value="{{ yr }}" {{ 'selected' if yr == selected_year else '' }}>{{ yr }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-header">Income Statement <span class="card-count">{{ txn_count }} transactions</span></div>
+    <div class="summary-row"><span class="label">Sales Revenue</span><span class="value">${{ "{:,.2f}".format(agg.revenue.sales) }}</span></div>
+    <div class="summary-row"><span class="label">Other Income</span><span class="value">${{ "{:,.2f}".format(agg.revenue.other_income) }}</span></div>
+    <div class="summary-row subtotal"><span class="label">Total Revenue</span><span class="value">${{ "{:,.2f}".format(t2.total_revenue) }}</span></div>
+    <div class="summary-row"><span class="label">Cost of Goods Sold</span><span class="value">(${{ "{:,.2f}".format(t2.cost_of_goods) }})</span></div>
+    <div class="summary-row subtotal"><span class="label">Gross Profit</span><span class="value">${{ "{:,.2f}".format(t2.gross_profit) }}</span></div>
+    <div class="summary-row"><span class="label">Operating Expenses</span><span class="value">(${{ "{:,.2f}".format(t2.total_expenses) }})</span></div>
+    {% if t2.meals_disallowed > 0 %}
+    <div class="summary-row"><span class="label" style="font-size:0.75rem; color:var(--text-tertiary);">Meals non-deductible (50%)</span><span class="value" style="font-size:0.75rem; color:var(--text-tertiary);">${{ "{:,.2f}".format(t2.meals_disallowed) }}</span></div>
+    {% endif %}
+    <div class="summary-row total"><span class="label">Net Income (Loss)</span><span class="value {{ 'value-neg' if t2.net_income < 0 }}">${{ "{:,.2f}".format(t2.net_income) }}</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Expense Breakdown</div>
+    <div class="cat-summary">
+      {% for k in ["wages","rent","utilities","insurance","office_supplies","professional_fees","advertising","travel","meals_entertainment","interest","other","depreciation_cca"] %}
+      {% if agg.expenses.get(k, 0) > 0 %}
+      <div class="summary-row"><span class="label">{{ categories.get(k, k) }}</span><span class="value">${{ "{:,.2f}".format(agg.expenses[k]) }}</span></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="card">
+      <div class="card-header">Federal Tax</div>
+      <div class="summary-row"><span class="label">Taxable Income</span><span class="value">${{ "{:,.2f}".format(t2.taxable_income) }}</span></div>
+      <div class="summary-row total"><span class="label">Federal Tax</span><span class="value">${{ "{:,.2f}".format(t2.federal_tax) }}</span></div>
+      <p class="note">{% if data.business.ccpc %}CCPC small business rate (9%) on first $500K{% else %}General rate (15%){% endif %}</p>
+    </div>
+    <div class="card">
+      <div class="card-header">Provincial Tax ({{ t2.province }})</div>
+      <div class="summary-row"><span class="label">Taxable Income</span><span class="value">${{ "{:,.2f}".format(t2.taxable_income) }}</span></div>
+      <div class="summary-row total"><span class="label">Provincial Tax</span><span class="value">${{ "{:,.2f}".format(t2.provincial_tax) }}</span></div>
+    </div>
+  </div>
+
+  <div class="result-box {{ 'owing' if t2.total_tax > 0 else 'refund' }}">
+    <div class="result-label">Total Corporate Tax</div>
+    <div class="result-value">${{ "{:,.2f}".format(t2.total_tax) }}</div>
+  </div>
+  <p class="note" style="text-align:center;">Estimate only. File via CRA My Business Account or certified tax software. T2 due 6 months after year-end; tax owing due 2&ndash;3 months after.</p>
+</div>
+
+<!-- ============================================ GST/HST ===== -->
+<div id="panel-gst" class="panel">
+  <div class="panel-year-bar">
+    {% if available_years and available_years|length > 0 %}
+    <select class="year-select" onchange="changeYear(this.value)">
+      {% for yr in available_years %}
+      <option value="{{ yr }}" {{ 'selected' if yr == selected_year else '' }}>{{ yr }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-header">{{ gst.rate_label }} Return Summary <span class="card-count">{{ gst.rate_pct }}</span></div>
+    <div class="summary-row"><span class="label">{{ gst.rate_label }} Collected (Line 105)</span><span class="value">${{ "{:,.2f}".format(gst.collected) }}</span></div>
+    <div class="summary-row"><span class="label">Input Tax Credits (Line 108)</span><span class="value">(${{ "{:,.2f}".format(gst.total_itc) }})</span></div>
+    <div class="summary-row total"><span class="label">Net Tax (Line 109)</span><span class="value {{ 'value-neg' if gst.net_tax < 0 }}">${{ "{:,.2f}".format(gst.net_tax) }}</span></div>
+  </div>
+  <div class="card">
+    <div class="card-header">Payment Summary</div>
+    <div class="summary-row"><span class="label">Net Tax</span><span class="value">${{ "{:,.2f}".format(gst.net_tax) }}</span></div>
+    <div class="summary-row"><span class="label">Installments Paid</span><span class="value">(${{ "{:,.2f}".format(gst.installments) }})</span></div>
+    <div class="summary-row total"><span class="label">{{ "Balance Owing" if gst.balance >= 0 else "Refund Claimed" }}</span><span class="value">${{ "{:,.2f}".format(gst.balance|abs) }}</span></div>
+  </div>
+  <div class="result-box {{ 'owing' if gst.balance > 0 else 'refund' }}">
+    <div class="result-label">{{ "Balance Owing" if gst.balance >= 0 else "Refund" }}</div>
+    <div class="result-value">${{ "{:,.2f}".format(gst.balance|abs) }}</div>
+  </div>
+  <p class="note" style="text-align:center;">File via CRA My Business Account or GST/HST NETFILE. Annual filers: due 3 months after fiscal year-end.</p>
+</div>
+
+<!-- ============================================ DATA QUALITY ===== -->
+<div id="panel-quality" class="panel">
+  <div class="panel-year-bar">
+    {% if available_years and available_years|length > 0 %}
+    <select class="year-select" onchange="changeYear(this.value)">
+      {% for yr in available_years %}
+      <option value="{{ yr }}" {{ 'selected' if yr == selected_year else '' }}>{{ yr }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+{% if warnings %}
+<div class="warnings">
+  <div class="warnings-header">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Data Quality Checks
+  </div>
+
+  {% if warnings.missing_months %}
+  <div class="warning-section">
+    <div class="warning-title">Missing Bank/CC Statements ({{ warnings.missing_months|length }} months)</div>
+    <div class="warning-badges">
+      {% for m in warnings.missing_months %}
+      <span class="warning-badge">{{ m }}</span>
+      {% endfor %}
+    </div>
+    <div class="warning-note">Upload statements for these months. Coverage: {{ warnings.fy_months_covered }}.</div>
+  </div>
+  {% endif %}
+
+  {% if warnings.duplicates %}
+  <div class="warning-section">
+    <div class="warning-title">Possible Duplicates ({{ warnings.duplicates|length }} pairs)</div>
+    {% for a, b in warnings.duplicates[:5] %}
+    <div style="font-size:0.78rem; color:var(--text-secondary); padding:0.35rem 0; border-bottom:1px solid var(--amber-border); display:flex; align-items:center; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+      <span>{{ a.date }}: "{{ a.description }}" (${{ "{:,.2f}".format(a.amount|abs) }}, {{ a.source }}) &harr; "{{ b.description }}" ({{ b.source }})</span>
+      <form method="post" action="/resolve-duplicate" style="display:inline; margin:0;">
+        <input type="hidden" name="txn_id" value="{{ b.id }}">
+        <button type="submit" class="btn btn-outline btn-sm" style="color:var(--amber); border-color:var(--amber-border);">Skip Duplicate</button>
+      </form>
+    </div>
+    {% endfor %}
+    {% if warnings.duplicates|length > 5 %}
+    <div class="warning-note">...and {{ warnings.duplicates|length - 5 }} more.</div>
+    {% endif %}
+    <div style="margin-top:0.5rem; display:flex; align-items:center; gap:0.75rem;">
+      <form method="post" action="/resolve-all-duplicates" style="display:inline; margin:0;">
+        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Mark {{ warnings.duplicates|length }} transaction(s) as Skip?');">Auto-resolve All</button>
+      </form>
+      <span class="warning-note" style="margin:0;">Marks the second item in each pair as Skip.</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if warnings.hst_gaps %}
+  <div class="warning-section">
+    <div class="warning-title">Missing HST/GST on {{ warnings.hst_gaps }} Expenses</div>
+    <div class="warning-note">
+      Estimated unclaimed ITCs: <strong style="color:var(--green);">${{ "{:,.2f}".format(warnings.estimated_missing_itc) }}</strong>.
+      Upload receipt photos to claim these credits.
+    </div>
+  </div>
+  {% endif %}
+
+  {% if warnings.no_revenue %}
+  <div class="warning-section">
+    <div class="warning-title" style="color:var(--red);">No revenue transactions found</div>
+    <div class="warning-note">Import POS data or add sales entries.</div>
+  </div>
+  {% endif %}
+
+  {% if warnings.no_expenses %}
+  <div class="warning-section">
+    <div class="warning-title" style="color:var(--red);">No expense transactions found</div>
+    <div class="warning-note">Import bank/CC statements or add receipts.</div>
+  </div>
+  {% endif %}
+
+  {% if warnings.revenue_recon %}
+  <div class="warning-section">
+    <div class="warning-title">Revenue Reconciliation Gap</div>
+    <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.8rem; margin-bottom:0.35rem;">
+      <span class="warning-note" style="margin:0;">POS Revenue (Toast + Square + GoDaddy)</span>
+      <span style="font-family:var(--font-mono); text-align:right;">${{ "{:,.2f}".format(warnings.revenue_recon.pos_total) }}</span>
+      <span class="warning-note" style="margin:0;">Bank Deposits</span>
+      <span style="font-family:var(--font-mono); text-align:right;">${{ "{:,.2f}".format(warnings.revenue_recon.bank_deposits) }}</span>
+      <span style="font-weight:600;">Gap</span>
+      <span style="font-family:var(--font-mono); text-align:right; font-weight:600; color:var(--red);">${{ "{:,.2f}".format(warnings.revenue_recon.gap) }} ({{ warnings.revenue_recon.gap_pct }}%)</span>
+    </div>
+    {% if warnings.revenue_recon.monthly_gaps %}
+    <div class="warning-note">Monthly discrepancies: {{ warnings.revenue_recon.monthly_gaps|map(attribute='month')|join(', ') }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if warnings.expected_categories %}
+  <div class="warning-section">
+    <div class="warning-title">Completeness Checks ({{ warnings.expected_categories|length }})</div>
+    {% for w in warnings.expected_categories %}
+    <div style="display:flex; align-items:flex-start; gap:0.5rem; padding:0.3rem 0; border-bottom:1px solid var(--amber-border); font-size:0.78rem;">
+      <span style="flex-shrink:0; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.65rem; font-weight:600; text-transform:uppercase;
+        {% if w.type == 'missing_category' %}background:var(--red-bg); color:var(--red);
+        {% elif w.type == 'sparse_category' %}background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border);
+        {% else %}background:var(--red-bg); color:var(--red);{% endif %}">
+        {% if w.type == 'missing_category' %}Missing{% elif w.type == 'sparse_category' %}Sparse{% else %}Check{% endif %}
+      </span>
+      <span><strong>{{ w.label }}:</strong> {{ w.message }}</span>
+    </div>
+    {% endfor %}
+    <div class="warning-note">Based on typical small business patterns. Dismiss any that don't apply.</div>
+  </div>
+  {% endif %}
+
+  {% if not warnings.missing_months and not warnings.duplicates and not warnings.hst_gaps and not warnings.no_revenue and not warnings.no_expenses and not warnings.revenue_recon and not warnings.expected_categories %}
+  <div class="warning-success">All checks passed &mdash; your data looks complete.</div>
+  {% endif %}
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+  <div style="color:var(--text-tertiary); font-size:0.9rem;">No data to check yet. Add some transactions first.</div>
+</div>
+{% endif %}
+</div>
+
+<!-- ============================================ MATCHING ===== -->
+<div id="panel-matching" class="panel">
+  {% if match_suggestions %}
+  <div class="card">
+    <div class="card-header">Match Suggestions <span class="card-count">{{ match_count }} pending</span></div>
+    <p class="note" style="margin-bottom:1rem;">Review each pair: the receipt on the left should match the statement entry on the right.</p>
+  </div>
+
+  {% for m in match_suggestions %}
+  {% set receipt = m if m.txn_a_doc_type == 'receipt' else none %}
+  {% set stmt = m if m.txn_b_doc_type != 'receipt' else none %}
+  {% set r_prefix = 'txn_a' if m.txn_a_doc_type == 'receipt' else 'txn_b' %}
+  {% set s_prefix = 'txn_b' if m.txn_a_doc_type == 'receipt' else 'txn_a' %}
+  <div class="card" style="margin-bottom:0.75rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0.75rem; border-bottom:1px solid var(--border); background:var(--bg);">
+      <span style="font-size:0.78rem; font-weight:600; color:var(--accent);">{{ (m.confidence * 100)|int }}% match</span>
+      <div style="display:flex; gap:0.5rem;">
+        <form method="post" action="/accept-match" style="margin:0;">
+          <input type="hidden" name="suggestion_id" value="{{ m.id }}">
+          <button type="submit" class="btn btn-primary" style="padding:0.3rem 1rem; font-size:0.75rem;">Accept</button>
+        </form>
+        <form method="post" action="/reject-match" style="margin:0;">
+          <input type="hidden" name="suggestion_id" value="{{ m.id }}">
+          <button type="submit" class="btn btn-outline" style="padding:0.3rem 1rem; font-size:0.75rem;">Reject</button>
+        </form>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; min-height:200px;">
+      <!-- Receipt side -->
+      <div style="padding:0.75rem; border-right:1px solid var(--border);">
+        <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-tertiary); font-weight:600; margin-bottom:0.5rem;">Receipt</div>
+        {% set r_file = m['txn_a_ocr_file'] if m.txn_a_doc_type == 'receipt' else m['txn_b_ocr_file'] %}
+        {% if r_file %}
+        <div style="max-height:280px; overflow:hidden; border-radius:6px; margin-bottom:0.5rem; background:var(--bg);">
+          <img src="/uploads/{{ r_file }}" alt="Receipt" style="width:100%; object-fit:contain; max-height:280px;">
+        </div>
+        {% endif %}
+        <div style="font-size:0.82rem; font-weight:500;">{{ m[r_prefix + '_store_name'] or m[r_prefix + '_description'] }}</div>
+        <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:0.25rem;">
+          {{ m[r_prefix + '_date'] }} &middot;
+          <span class="mono">${{ "{:,.2f}".format(m[r_prefix + '_amount']|abs) }}</span>
+          {% if m[r_prefix + '_tax'] %} + ${{ "{:,.2f}".format(m[r_prefix + '_tax']|abs) }} tax{% endif %}
+        </div>
+      </div>
+      <!-- Statement side -->
+      <div style="padding:0.75rem;">
+        <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-tertiary); font-weight:600; margin-bottom:0.5rem;">
+          {{ 'Credit Card' if m[s_prefix + '_doc_type'] == 'credit_card' else 'Bank' }} Statement
+        </div>
+        <div style="padding:1.5rem 1rem; background:var(--bg); border-radius:6px; margin-bottom:0.5rem;">
+          <div style="font-size:0.82rem; font-weight:500;">{{ m[s_prefix + '_description'] }}</div>
+          <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:0.5rem;">
+            {{ m[s_prefix + '_date'] }}
+          </div>
+          <div style="font-size:1.1rem; font-weight:600; color:var(--accent); margin-top:0.5rem;">
+            ${{ "{:,.2f}".format(m[s_prefix + '_amount']|abs) }}
+          </div>
+          <div style="margin-top:0.5rem;">
+            <span class="src-tag">{{ m[s_prefix + '_source'] }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="card" style="text-align:center; padding:3rem;">
+    <div style="color:var(--text-tertiary); font-size:0.9rem;">No pending matches. Upload receipts and import statements to see auto-detected matches here.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ============================================ SETTINGS ===== -->
+<div id="panel-settings" class="panel">
+  <form method="post" action="/save-settings">
+    <div class="card">
+      <div class="card-header">Business Information</div>
+      <div class="field"><label>Legal Name</label><input type="text" name="biz_name" value="{{ data.business.name }}"></div>
+      <div class="field"><label>Business Number (BN)</label><input type="text" name="biz_bn" value="{{ data.business.bn }}" placeholder="123456789RC0001"></div>
+      <div class="field"><label>Province</label>
+        <select name="biz_province">{% for prov in provinces %}<option value="{{ prov }}" {{ "selected" if prov == data.business.province }}>{{ prov }}</option>{% endfor %}</select>
+      </div>
+      <div class="field"><label>Fiscal Year End</label><input type="date" name="biz_fye" value="{{ data.business.fiscal_year_end }}"></div>
+      <div class="field field-check">
+        <input type="checkbox" name="biz_ccpc" id="biz_ccpc" {{ "checked" if data.business.ccpc }}>
+        <label for="biz_ccpc">Canadian-Controlled Private Corporation (CCPC)</label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Receipt OCR (AI-Powered)</div>
+      <p class="note" style="margin-top:0; margin-bottom:0.75rem;">Receipt scanning uses Claude Vision AI for accurate data extraction, with Tesseract OCR as fallback.</p>
+    </div>
+    <div class="card">
+      <div class="card-header">Telegram Integration</div>
+      <p class="note" style="margin-top:0; margin-bottom:0.75rem;">Send receipt photos via Telegram for instant OCR. Link your account to the bot.</p>
+      <div class="field">
+        <label>Phone Number</label>
+        <input type="tel" name="phone" value="{{ user.phone if user else '' }}" placeholder="+1234567890">
+      </div>
+      <div class="how-to" style="margin-top:0.75rem; padding:0.75rem; background:var(--accent-muted); border-radius:8px; font-size:0.8rem;">
+        <strong>How to link Telegram:</strong>
+        <ol style="margin:0.5rem 0 0 1.2rem; padding:0;">
+          <li>Search for our bot on Telegram (ask your admin for the bot name)</li>
+          <li>Send <code>/start</code> to the bot</li>
+          <li>Send <code>/link {{ user.email if user else 'your@email.com' }}</code></li>
+          <li>The bot will confirm the link. Then just send receipt photos!</li>
+        </ol>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Manual Adjustments</div>
+      <p class="note" style="margin-top:0; margin-bottom:1rem;">Values that can't be derived from transaction data.</p>
+      <div class="field"><label>Opening Inventory</label><input type="number" step="0.01" name="adj_opening_inventory" value="{{ data.manual_adjustments.opening_inventory }}"></div>
+      <div class="field"><label>Closing Inventory</label><input type="number" step="0.01" name="adj_closing_inventory" value="{{ data.manual_adjustments.closing_inventory }}"></div>
+      <div class="field"><label>Capital Cost Allowance (CCA)</label><input type="number" step="0.01" name="adj_depreciation_cca" value="{{ data.manual_adjustments.depreciation_cca }}"></div>
+      <div class="field"><label>GST/HST Installments Paid</label><input type="number" step="0.01" name="adj_gst_installments" value="{{ data.manual_adjustments.gst_installments_paid }}"></div>
+      <div class="field field-check" style="margin-top:0.5rem;">
+        <input type="checkbox" name="adj_auto_estimate_hst" id="adj_auto_estimate_hst" {{ "checked" if data.manual_adjustments.get("auto_estimate_hst", True) }}>
+        <label for="adj_auto_estimate_hst">Auto-estimate HST/GST on expenses missing tax breakdowns</label>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
+  </form>
+</div>
+
+</div><!-- .container -->
+
+<script>
+function toggleStmt(header) {
+  var body = header.nextElementSibling;
+  var arrow = header.querySelector('.stmt-arrow');
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function showTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function changeYear(year) {
+  /* Find which tab is currently active to preserve it */
+  var activePanel = document.querySelector('.panel.active');
+  var hash = activePanel ? activePanel.id.replace('panel-', '') : '';
+  var url = window.location.pathname + '?year=' + encodeURIComponent(year);
+  if (hash) url += '#' + hash;
+  window.location.href = url;
+}
+
+if (window.location.hash) {
+  const tab = window.location.hash.substring(1);
+  const panel = document.getElementById('panel-' + tab);
+  if (panel) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    panel.classList.add('active');
+    document.querySelectorAll('.tab').forEach(t => {
+      if (t.textContent.toLowerCase().includes(tab.substring(0, 4))) t.classList.add('active');
+    });
+  }
+}
+
+function filterTxns() {
+  const src = document.getElementById('filter-source').value;
+  const cat = document.getElementById('filter-cat').value;
+  const search = document.getElementById('filter-search').value.toLowerCase();
+  document.querySelectorAll('#txn-table tbody tr').forEach(row => {
+    const matchSrc = !src || row.dataset.source === src;
+    const matchCat = !cat || row.dataset.cat === cat;
+    const matchSearch = !search || row.dataset.desc.includes(search);
+    row.style.display = (matchSrc && matchCat && matchSearch) ? '' : 'none';
+  });
+}
+
+function filterPendingTxns() {
+  const src = document.getElementById('pending-filter-source').value;
+  const cat = document.getElementById('pending-filter-cat').value;
+  const search = document.getElementById('pending-filter-search').value.toLowerCase();
+  document.querySelectorAll('#pending-table tbody tr').forEach(row => {
+    const matchSrc = !src || row.dataset.source === src;
+    const matchCat = !cat || row.dataset.cat === cat;
+    const matchSearch = !search || row.dataset.desc.includes(search);
+    row.style.display = (matchSrc && matchCat && matchSearch) ? '' : 'none';
+  });
+}
+
+function deleteTxn(id) {
+  if (!confirm('Delete this transaction?')) return;
+  document.getElementById('del-txn-id').value = id;
+  var activePanel = document.querySelector('.panel.active');
+  var hash = activePanel ? activePanel.id.replace('panel-', '') : 'transactions';
+  document.getElementById('del-txn-redirect').value = '{{ url_for("dashboard") }}#' + hash;
+  document.getElementById('del-txn-form').submit();
+}
+
+/* ===== LINK TRANSACTIONS ===== */
+let linkMode = false;
+let linkPrimaryId = null;
+let linkBanner = null;
+
+function toggleLinked(parentId) {
+  const rows = document.querySelectorAll('.linked-child-row[data-parent="' + parentId + '"]');
+  const btn = document.querySelector('.txn-row[data-id="' + parentId + '"] .expand-btn');
+  const visible = rows[0] && rows[0].style.display !== 'none';
+  rows.forEach(r => r.style.display = visible ? 'none' : '');
+  if (btn) btn.classList.toggle('expanded', !visible);
+}
+
+function getTxnDesc(id) {
+  const row = document.querySelector('.txn-row[data-id="' + id + '"]');
+  if (!row) return id;
+  const date = row.children[2].textContent.trim();
+  const desc = row.children[3].textContent.trim();
+  const amt = row.children[4].textContent.trim();
+  return date + ' — ' + desc + ' (' + amt + ')';
+}
+
+function startLink(primaryId) {
+  linkPrimaryId = primaryId;
+  linkMode = true;
+  if (linkBanner) linkBanner.remove();
+  linkBanner = document.createElement('div');
+  linkBanner.className = 'link-select-banner';
+  linkBanner.innerHTML = 'Click a transaction to link it under: <strong>' + getTxnDesc(primaryId) + '</strong> <button onclick="cancelLink()">Cancel</button>';
+  const table = document.getElementById('txn-table');
+  table.parentElement.insertBefore(linkBanner, table);
+  document.querySelector('.txn-row[data-id="' + primaryId + '"]').classList.add('link-mode-row');
+}
+
+function cancelLink() {
+  linkMode = false;
+  linkPrimaryId = null;
+  if (linkBanner) { linkBanner.remove(); linkBanner = null; }
+  document.querySelectorAll('.txn-row').forEach(r => r.classList.remove('link-mode-row'));
+}
+
+// Intercept row clicks when in link mode
+document.addEventListener('click', function(e) {
+  if (!linkMode) return;
+  const row = e.target.closest('.txn-row');
+  if (!row) return;
+  const childId = row.dataset.id;
+  if (!childId || childId === linkPrimaryId) return;
+  // Don't link a row that's already a child
+  if (row.classList.contains('linked-child-row')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  // Confirm
+  if (!confirm('Link "' + getTxnDesc(childId) + '" under the primary record?\n\nIt will be kept as a supporting document but won\'t count in totals.')) return;
+  document.getElementById('link-txn-id').value = childId;
+  document.getElementById('link-txn-target').value = linkPrimaryId;
+  cancelLink();
+  document.getElementById('link-txn-form').submit();
+}, true);
+
+function unlinkTxn(id) {
+  document.getElementById('unlink-txn-id').value = id;
+  document.getElementById('unlink-txn-form').submit();
+}
+
+/* Drag and drop enhancement for upload zones */
+document.querySelectorAll('.upload-zone').forEach(zone => {
+  ['dragenter','dragover'].forEach(e => {
+    zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.add('dragover'); });
+  });
+  ['dragleave','drop'].forEach(e => {
+    zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.remove('dragover'); });
+  });
+  zone.addEventListener('drop', ev => {
+    const input = zone.querySelector('input[type="file"]');
+    if (input && ev.dataTransfer.files.length) { input.files = ev.dataTransfer.files; }
+  });
+});
+</script>
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
+  <span class="close-lb">&times;</span>
+  <img id="lightbox-img" src="" alt="Receipt">
+</div>
+<script>
+function viewReceipt(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+
+/* ===== Zoom & Pan for review images ===== */
+const viewers = {};
+
+function getViewer(wrapId) {
+  if (!viewers[wrapId]) viewers[wrapId] = { scale: 1, tx: 0, ty: 0 };
+  return viewers[wrapId];
+}
+
+function applyTransform(wrapId) {
+  const v = getViewer(wrapId);
+  const img = document.querySelector('#' + wrapId + ' img');
+  if (!img) return;
+  img.style.transform = 'translate(' + v.tx + 'px,' + v.ty + 'px) scale(' + v.scale + ')';
+}
+
+function zoomImg(wrapId, dir) {
+  const v = getViewer(wrapId);
+  const wrap = document.getElementById(wrapId);
+  if (dir === 0) {
+    v.scale = 1; v.tx = 0; v.ty = 0;
+    /* Restore bbox framing if present */
+    if (wrap && wrap._bbox) {
+      var b = wrap._bbox;
+      var img = wrap.querySelector('img');
+      if (img) {
+        var right = 100 - b.left - b.width;
+        var bottom = 100 - b.top - b.height;
+        img.style.clipPath = 'inset(' + b.top + '% ' + right + '% ' + bottom + '% ' + b.left + '%)';
+        var sx = 100 / b.width, sy = 100 / b.height;
+        img.style.transform = 'scale(' + sx + ', ' + sy + ')';
+        img.style.transformOrigin = b.left + '% ' + b.top + '%';
+        return;
+      }
+    }
+  } else {
+    v.scale = Math.max(1, Math.min(6, v.scale + dir * 0.1));
+    /* Clear bbox clip when user manually zooms */
+    if (wrap && wrap._bbox) {
+      var img = wrap.querySelector('img');
+      if (img) { img.style.clipPath = ''; img.style.transformOrigin = 'center center'; }
+    }
+  }
+  if (v.scale === 1) { v.tx = 0; v.ty = 0; }
+  applyTransform(wrapId);
+}
+
+function initImageViewers() {
+  /* Drag to pan + wheel zoom + pinch zoom */
+  document.querySelectorAll('.review-image-wrap').forEach(function(wrap) {
+    if (wrap._viewerInit) return;
+    wrap._viewerInit = true;
+    const id = wrap.id;
+    let dragging = false, startX, startY, startTx, startTy;
+
+    wrap.addEventListener('mousedown', function(e) {
+      const v = getViewer(id);
+      if (v.scale <= 1) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startTx = v.tx; startTy = v.ty;
+      wrap.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      const v = getViewer(id);
+      v.tx = startTx + (e.clientX - startX);
+      v.ty = startTy + (e.clientY - startY);
+      applyTransform(id);
+    });
+    window.addEventListener('mouseup', function() {
+      if (dragging) { dragging = false; wrap.style.cursor = 'grab'; }
+    });
+
+    let touchStart = null;
+    wrap.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 1) {
+        const v = getViewer(id);
+        if (v.scale <= 1) return;
+        touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, tx: v.tx, ty: v.ty };
+      }
+    }, {passive: true});
+    wrap.addEventListener('touchmove', function(e) {
+      const v = getViewer(id);
+      if (e.touches.length === 1 && touchStart && v.scale > 1) {
+        v.tx = touchStart.tx + (e.touches[0].clientX - touchStart.x);
+        v.ty = touchStart.ty + (e.touches[0].clientY - touchStart.y);
+        applyTransform(id);
+        e.preventDefault();
+      }
+      if (e.touches.length === 2) {
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        if (wrap._lastPinch) {
+          const delta = (dist - wrap._lastPinch) * 0.012;
+          v.scale = Math.max(1, Math.min(6, v.scale + delta));
+          if (v.scale === 1) { v.tx = 0; v.ty = 0; }
+          applyTransform(id);
+        }
+        wrap._lastPinch = dist;
+        e.preventDefault();
+      }
+    }, {passive: false});
+    wrap.addEventListener('touchend', function() { touchStart = null; wrap._lastPinch = null; });
+
+    wrap.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      const v = getViewer(id);
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      v.scale = Math.max(1, Math.min(6, v.scale + delta));
+      if (v.scale === 1) { v.tx = 0; v.ty = 0; }
+      applyTransform(id);
+    });
+  });
+
+  /* Apply bounding-box framing for multi-receipt images */
+  document.querySelectorAll('.review-image-wrap[data-bbox]').forEach(function(wrap) {
+    if (wrap._bboxInit) return;
+    wrap._bboxInit = true;
+    try {
+      var b = JSON.parse(wrap.dataset.bbox);
+      var img = wrap.querySelector('img');
+      if (!img) return;
+      if (b.top <= 1 && b.left <= 1 && b.width >= 98 && b.height >= 98) return;
+      var right = 100 - b.left - b.width;
+      var bottom = 100 - b.top - b.height;
+      img.style.clipPath = 'inset(' + b.top + '% ' + right + '% ' + bottom + '% ' + b.left + '%)';
+      var scaleX = 100 / b.width;
+      var scaleY = 100 / b.height;
+      img.style.transform = 'scale(' + scaleX + ', ' + scaleY + ')';
+      img.style.transformOrigin = b.left + '% ' + b.top + '%';
+      wrap._bbox = b;
+    } catch(e) {}
+  });
+}
+initImageViewers();
+
+/* ===== Toggle Checked / Pending ===== */
+function toggleReview(txnId) {
+  const panel = document.getElementById('review-panel-' + txnId);
+  const isOpen = panel.style.display !== 'none';
+  /* Close all panels and remove highlights */
+  document.querySelectorAll('.review-panel').forEach(function(p) { p.style.display = 'none'; });
+  document.querySelectorAll('.txn-row').forEach(function(r) { r.classList.remove('active-row'); });
+  if (!isOpen) {
+    panel.style.display = 'block';
+    event.currentTarget.classList.add('active-row');
+    panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  }
+}
+
+function calcTotal(txnId) {
+  const amt = parseFloat(document.getElementById('amt-' + txnId).value) || 0;
+  const tax = parseFloat(document.getElementById('tax-' + txnId).value) || 0;
+  document.getElementById('total-' + txnId).value = '$' + (amt + tax).toFixed(2);
+}
+
+function toggleReviewed(txnId, btn) {
+  const input = document.getElementById('reviewed-' + txnId);
+  const item = document.getElementById('review-' + txnId);
+  const isChecked = input.value === 'true';
+  input.value = isChecked ? 'false' : 'true';
+  btn.textContent = isChecked ? 'Pending' : 'Checked';
+  btn.className = 'status-btn ' + (isChecked ? 'pending' : 'checked-status');
+  item.classList.toggle('checked', !isChecked);
+  /* Auto-save the status */
+  fetch('/update-review-status', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({txn_id: txnId, reviewed: !isChecked})
+  });
+}
+</script>
+
+<!-- ===== LOADING OVERLAY ===== -->
+<style>
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(246,243,238,0.92);
+  backdrop-filter: blur(8px);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2rem;
+  animation: loadFadeIn 0.2s ease;
+}
+.loading-overlay.active { display: flex; }
+@keyframes loadFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.loading-scene { position: relative; width: 160px; height: 120px; }
+
+/* Filing cabinet */
+.cabinet {
+  position: absolute; bottom: 0; right: 0;
+  width: 60px; height: 70px;
+  background: var(--accent);
+  border-radius: 4px 4px 2px 2px;
+  box-shadow: 0 4px 16px rgba(146,112,42,0.3);
+}
+.cabinet::before {
+  content: ''; position: absolute;
+  top: 12px; left: 50%; transform: translateX(-50%);
+  width: 36px; height: 6px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px;
+}
+.cabinet::after {
+  content: ''; position: absolute;
+  top: 32px; left: 50%; transform: translateX(-50%);
+  width: 36px; height: 6px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px;
+}
+.cabinet-handle {
+  position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+  width: 14px; height: 4px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 2px;
+}
+
+/* Flying papers */
+.paper {
+  position: absolute;
+  width: 32px; height: 40px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  animation: paperFly 1.8s ease-in-out infinite;
+}
+.paper::before {
+  content: '';
+  position: absolute; top: 8px; left: 5px; right: 5px;
+  height: 2px; background: #e0d9cf;
+  box-shadow: 0 5px 0 #e0d9cf, 0 10px 0 #e0d9cf, 0 15px 0 #e0d9cf;
+}
+.paper:nth-child(2) { animation-delay: 0.6s; }
+.paper:nth-child(3) { animation-delay: 1.2s; }
+
+@keyframes paperFly {
+  0% {
+    left: -10px; top: 20px;
+    transform: rotate(-15deg) scale(1);
+    opacity: 0;
+  }
+  15% { opacity: 1; }
+  50% {
+    left: 50px; top: -10px;
+    transform: rotate(10deg) scale(0.9);
+    opacity: 1;
+  }
+  85% { opacity: 1; }
+  100% {
+    left: 100px; top: 30px;
+    transform: rotate(2deg) scale(0.7);
+    opacity: 0;
+  }
+}
+
+/* Calculator bouncing */
+.calc {
+  position: absolute; bottom: 4px; left: 10px;
+  font-size: 28px;
+  animation: calcBounce 0.6s ease infinite alternate;
+}
+@keyframes calcBounce {
+  from { transform: translateY(0) rotate(-5deg); }
+  to { transform: translateY(-6px) rotate(5deg); }
+}
+
+.loading-text {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.loading-quip {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+</style>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-scene">
+    <div class="paper"></div>
+    <div class="paper"></div>
+    <div class="paper"></div>
+    <div class="calc">🧮</div>
+    <div class="cabinet"><div class="cabinet-handle"></div></div>
+  </div>
+  <div class="loading-text">
+    <div id="loadingMsg">Filing the paperwork...</div>
+    <div class="loading-quip" id="loadingQuip">The CRA can wait, but your receipts can't</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const quips = [
+    ["Filing the paperwork...", "The CRA can wait, but your receipts can't"],
+    ["Crunching the numbers...", "Your calculator called in sick, we got this"],
+    ["Sorting receipts...", "That coffee was definitely a business expense"],
+    ["Processing documents...", "Whoever invented HST owes us all an apology"],
+    ["Organizing your finances...", "Finding deductions you didn't know existed"],
+    ["Categorizing expenses...", "Is a second espresso machine tax-deductible? Asking for a friend"],
+    ["Tallying it up...", "Math: the only place where your problems actually get solved"],
+    ["Preparing your return...", "Making the taxman slightly less scary since 2026"],
+    ["Shuffling papers...", "Trees died for these receipts, let's honour them"],
+    ["Running the numbers...", "If only our bank accounts grew as fast as our expenses"],
+  ];
+
+  function showLoading() {
+    const pick = quips[Math.floor(Math.random() * quips.length)];
+    document.getElementById('loadingMsg').textContent = pick[0];
+    document.getElementById('loadingQuip').textContent = pick[1];
+    document.getElementById('loadingOverlay').classList.add('active');
+  }
+
+  // Trigger on year dropdown change
+  const sel = document.querySelector('.year-select');
+  if (sel) sel.addEventListener('change', showLoading);
+
+  // Trigger on form submits (imports, bulk updates, etc.)
+  document.querySelectorAll('form').forEach(function(f) {
+    f.addEventListener('submit', function() {
+      setTimeout(showLoading, 50);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# fly.toml app configuration file generated for gleamnsip on 2026-03-12T17:47:02-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'gleamnsip'
+primary_region = 'yyz'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  PORT = '8080'
+
+[[mounts]]
+  source = 'gleamnsip_data'
+  destination = '/app/uploads'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
