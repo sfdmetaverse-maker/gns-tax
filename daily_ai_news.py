@@ -118,9 +118,12 @@ def _call_claude(prompt, max_tokens=4000):
         msg = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=max_tokens,
+            tools=[{"type": "web_search_20250305"}],
             messages=[{"role": "user", "content": prompt}],
         )
-        return msg.content[0].text
+        # Extract text blocks from response (skip tool use/result blocks)
+        text_parts = [block.text for block in msg.content if hasattr(block, "text")]
+        return "\n".join(text_parts) if text_parts else None
     except Exception as e:
         logger.error("Claude API call failed: %s", e)
         return None
