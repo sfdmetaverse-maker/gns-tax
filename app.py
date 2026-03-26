@@ -43,6 +43,9 @@ auth.init_app(app)
 from telegram_bot import telegram_bp
 app.register_blueprint(telegram_bp)
 
+from daily_ai_news import ai_news_bp
+app.register_blueprint(ai_news_bp)
+
 db.init_db()
 
 
@@ -2028,6 +2031,69 @@ def admin_regenerate_invite(org_id):
     db.update_org(org_id, {"invite_code": new_code})
     flash(f"New invite code: {new_code}")
     return redirect(url_for("admin_view_org", org_id=org_id))
+
+
+# ---------------------------------------------------------------------------
+# Daily AI News — scheduled + on-demand
+# ---------------------------------------------------------------------------
+
+@app.route("/api/daily-ai-news", methods=["POST"])
+def api_daily_ai_news():
+    """Trigger daily AI news digest. Requires BULK_IMPORT_KEY for auth."""
+    key = request.form.get("key") or request.args.get("key") or request.json.get("key", "") if request.is_json else ""
+    if key != os.environ.get("BULK_IMPORT_KEY", "gleam-bulk-2026"):
+        return jsonify({"error": "unauthorized"}), 403
+
+    from daily_ai_news import send_daily_news, save_digest_to_file
+
+    # Optional: send to specific chat_id, otherwise all linked users
+    chat_id = request.form.get("chat_id") or (request.json.get("chat_id") if request.is_json else None)
+    chat_ids = [chat_id] if chat_id else None
+
+    digest = send_daily_news(chat_ids=chat_ids)
+    if digest:
+        save_digest_to_file(digest)
+        return jsonify({"status": "ok", "length": len(digest)})
+    return jsonify({"error": "failed to generate digest"}), 500
+
+
+def _start_news_scheduler():
+    """Start APScheduler for daily AI news at 9:30 AM ET."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        import pytz
+    except ImportError:
+        logger.warning("APScheduler not installed — daily AI news scheduler disabled. "
+                       "Install with: pip install apscheduler pytz")
+        return
+
+    def _daily_news_job():
+        with app.app_context():
+            from daily_ai_news import send_daily_news, save_digest_to_file
+            logger.info("Running scheduled daily AI news job")
+            digest = send_daily_news()
+            if digest:
+                save_digest_to_file(digest)
+                logger.info("Daily AI news sent and saved")
+            else:
+                logger.error("Daily AI news job failed to generate digest")
+
+    et = pytz.timezone("America/New_York")
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        _daily_news_job,
+        CronTrigger(hour=9, minute=30, timezone=et),
+        id="daily_ai_news",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("Daily AI news scheduler started — 9:30 AM ET daily")
+
+
+# Start scheduler when running under gunicorn (not in debug/reloader)
+if not app.debug and os.environ.get("AI_NEWS_BOT_TOKEN"):
+    _start_news_scheduler()
 
 
 if __name__ == "__main__":

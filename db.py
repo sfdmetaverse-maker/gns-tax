@@ -219,6 +219,18 @@ def _apply_migrations():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_match_org ON match_suggestions(org_id, status)")
 
+            # 14. Create ai_news_subscribers table for the AI News Telegram bot
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ai_news_subscribers (
+                    id SERIAL PRIMARY KEY,
+                    chat_id TEXT UNIQUE NOT NULL,
+                    first_name TEXT NOT NULL DEFAULT '',
+                    username TEXT NOT NULL DEFAULT '',
+                    subscribed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE
+                )
+            """)
+
 
 def init_db():
     """Try to initialize DB. If Postgres isn't ready, it will be retried lazily."""
@@ -395,6 +407,70 @@ def update_last_login(user_id):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE users SET last_login = NOW() WHERE id = %s", (user_id,))
+
+
+def get_all_telegram_chat_ids():
+    """Return list of all distinct telegram_chat_id values (non-null)."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT telegram_chat_id FROM users "
+                "WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id != ''"
+            )
+            return [row[0] for row in cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# AI News Subscribers (for the separate AI News Telegram bot)
+# ---------------------------------------------------------------------------
+
+def add_ai_news_subscriber(chat_id, first_name="", username=""):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO ai_news_subscribers (chat_id, first_name, username, is_active)
+                VALUES (%s, %s, %s, TRUE)
+                ON CONFLICT (chat_id)
+                DO UPDATE SET is_active = TRUE, first_name = EXCLUDED.first_name,
+                             username = EXCLUDED.username
+            """, (str(chat_id), first_name, username))
+
+
+def remove_ai_news_subscriber(chat_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ai_news_subscribers SET is_active = FALSE WHERE chat_id = %s",
+                (str(chat_id),)
+            )
+
+
+def is_ai_news_subscriber(chat_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT is_active FROM ai_news_subscribers WHERE chat_id = %s",
+                (str(chat_id),)
+            )
+            row = cur.fetchone()
+            return row[0] if row else False
+
+
+def get_ai_news_subscribers():
+    """Return list of active subscriber chat_ids."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT chat_id FROM ai_news_subscribers WHERE is_active = TRUE"
+            )
+            return [row[0] for row in cur.fetchall()]
+
+
+def count_ai_news_subscribers():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM ai_news_subscribers WHERE is_active = TRUE")
+            return cur.fetchone()[0]
 
 
 # ---------------------------------------------------------------------------
