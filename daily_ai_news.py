@@ -1,8 +1,9 @@
 """Daily AI News Bot — separate Telegram bot for AI news digests.
 
 Uses its own bot token (AI_NEWS_BOT_TOKEN) and subscriber list.
-Subscribers managed via /subscribe and /unsubscribe commands.
-Broadcasts daily at 9:30 AM ET to all subscribers.
+News is fetched every 6 hours and cached in the DB.
+Users get cached news instantly on /start or /ainews.
+Daily push to subscribers at 9:30 AM ET.
 """
 
 import logging
@@ -96,25 +97,40 @@ def _tg_send(chat_id, text, token=None):
 
 
 # ---------------------------------------------------------------------------
-# News generation
+# News generation + caching
 # ---------------------------------------------------------------------------
 
-def fetch_top5_news():
-    """Fetch a quick top-5 AI news summary for welcome messages."""
+def _call_claude(prompt, max_tokens=4000):
+    """Make a Claude API call. Returns text or None."""
     try:
         import anthropic
     except ImportError:
+        logger.error("anthropic package not installed")
         return None
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
+        logger.error("ANTHROPIC_API_KEY not set")
         return None
 
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        msg = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text
+    except Exception as e:
+        logger.error("Claude API call failed: %s", e)
+        return None
+
+
+def _build_top5_prompt():
     today = datetime.now().strftime("%Y-%m-%d")
     today_display = datetime.now().strftime("%B %d, %Y")
     sources_list = "\n".join(f"- {s}" for s in NEWS_SOURCES)
-
-    prompt = f"""Today is {today}. Find the 5 most important AI news stories from the past 24-48 hours.
+    return f"""Today is {today}. Find the 5 most important AI news stories from the past 24-48 hours.
 
 Search these sources:
 {sources_list}
@@ -133,37 +149,12 @@ Use /ainews for the full daily digest.
 
 Keep it very concise. Include source name but no URLs."""
 
-    client = anthropic.Anthropic(api_key=api_key)
-    try:
-        msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=800,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return msg.content[0].text
-    except Exception as e:
-        logger.error("Top 5 news fetch failed: %s", e)
-        return None
 
-
-def fetch_ai_news_digest():
-    """Use Claude to research and compile today's AI news digest."""
-    try:
-        import anthropic
-    except ImportError:
-        logger.error("anthropic package not installed")
-        return None
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        logger.error("ANTHROPIC_API_KEY not set")
-        return None
-
+def _build_digest_prompt():
     today = datetime.now().strftime("%Y-%m-%d")
     today_display = datetime.now().strftime("%B %d, %Y")
     sources_list = "\n".join(f"- {s}" for s in NEWS_SOURCES)
-
-    prompt = f"""Today is {today}. Research and compile the latest AI news from the past 24-48 hours.
+    return f"""Today is {today}. Research and compile the latest AI news from the past 24-48 hours.
 
 Search these sources and any other reliable AI news sources you can find:
 {sources_list}
@@ -183,25 +174,45 @@ Include source URLs where possible.
 Keep it concise but comprehensive — aim for a 3-5 minute read.
 Start with: *Daily AI News — {today_display}*"""
 
-    client = anthropic.Anthropic(api_key=api_key)
 
-    try:
-        msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return msg.content[0].text
-    except Exception as e:
-        logger.error("Claude API call failed: %s", e)
-        return None
+def refresh_cached_news():
+    """Fetch fresh news from Claude and store in DB. Called every 6 hours."""
+    logger.info("Refreshing cached AI news...")
+
+    top5 = _call_claude(_build_top5_prompt(), max_tokens=800)
+    if top5:
+        db.save_cached_news("top5", top5)
+        logger.info("Cached top5 news updated")
+
+    digest = _call_claude(_build_digest_prompt(), max_tokens=4000)
+    if digest:
+        db.save_cached_news("digest", digest)
+        logger.info("Cached full digest updated")
+
+    return top5, digest
+
+
+def get_cached_top5():
+    """Get cached top 5 news. Returns text or None if no cache."""
+    return db.get_cached_news("top5")
+
+
+def get_cached_digest():
+    """Get cached full digest. Returns text or None if no cache."""
+    return db.get_cached_news("digest")
 
 
 def send_daily_news(chat_ids=None):
-    """Fetch AI news and send to specified chat IDs, or all subscribers."""
-    digest = fetch_ai_news_digest()
+    """Send cached digest to chat IDs, or all subscribers."""
+    digest = get_cached_digest()
     if not digest:
-        logger.error("Failed to generate AI news digest")
+        # No cache — try a fresh fetch
+        digest = _call_claude(_build_digest_prompt(), max_tokens=4000)
+        if digest:
+            db.save_cached_news("digest", digest)
+
+    if not digest:
+        logger.error("Failed to get AI news digest")
         return None
 
     token = _bot_token()
@@ -243,16 +254,15 @@ def _handle_start(chat_id, first_name, username):
         "Commands:\n"
         "/ainews — get today's full digest\n"
         "/unsubscribe — stop daily news\n"
-        "/status — check your subscription\n\n"
-        "Fetching today's top 5 stories for you..."
+        "/status — check your subscription\n"
     ))
 
-    # Send today's top 5 as welcome
-    top5 = fetch_top5_news()
+    # Send cached top 5 instantly
+    top5 = get_cached_top5()
     if top5:
         _tg_send(chat_id, top5)
     else:
-        _tg_send(chat_id, "Couldn't fetch today's news right now. Try /ainews later.")
+        _tg_send(chat_id, "News is being prepared. Use /ainews shortly to get the latest digest.")
 
 
 def _handle_subscribe(chat_id, first_name, username):
@@ -275,17 +285,25 @@ def _handle_unsubscribe(chat_id):
 def _handle_status(chat_id):
     is_sub = db.is_ai_news_subscriber(str(chat_id))
     count = db.count_ai_news_subscribers()
+    updated = db.get_cached_news_time("top5")
+    time_str = updated.strftime("%Y-%m-%d %H:%M ET") if updated else "never"
     if is_sub:
-        _tg_send(chat_id, f"You are subscribed.\nTotal subscribers: {count}\nNext digest: 9:30 AM ET tomorrow.")
+        _tg_send(chat_id, (
+            f"You are subscribed.\n"
+            f"Total subscribers: {count}\n"
+            f"Last news update: {time_str}\n"
+            f"News refreshes every 6 hours."
+        ))
     else:
-        _tg_send(chat_id, f"You are not subscribed.\nUse /subscribe to start receiving daily AI news.")
+        _tg_send(chat_id, "You are not subscribed.\nUse /subscribe to start receiving daily AI news.")
 
 
 def _handle_ainews(chat_id):
-    _tg_send(chat_id, "Researching today's AI news... This may take a moment.")
-    digest = send_daily_news(chat_ids=[str(chat_id)])
-    if not digest:
-        _tg_send(chat_id, "Sorry, couldn't fetch AI news right now. Try again later.")
+    digest = get_cached_digest()
+    if digest:
+        _tg_send(chat_id, digest)
+    else:
+        _tg_send(chat_id, "News is being prepared. Please try again in a few minutes.")
 
 
 @ai_news_bp.route("/webhook/ai-news", methods=["POST"])

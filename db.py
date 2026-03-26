@@ -231,6 +231,15 @@ def _apply_migrations():
                 )
             """)
 
+            # 15. Create ai_news_cache table for storing pre-fetched news
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ai_news_cache (
+                    news_type TEXT PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """)
+
 
 def init_db():
     """Try to initialize DB. If Postgres isn't ready, it will be retried lazily."""
@@ -471,6 +480,46 @@ def count_ai_news_subscribers():
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM ai_news_subscribers WHERE is_active = TRUE")
             return cur.fetchone()[0]
+
+
+# ---------------------------------------------------------------------------
+# AI News Cache
+# ---------------------------------------------------------------------------
+
+def save_cached_news(news_type, content):
+    """Save or update cached news content (news_type: 'top5' or 'digest')."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO ai_news_cache (news_type, content, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (news_type)
+                DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()
+            """, (news_type, content))
+
+
+def get_cached_news(news_type):
+    """Get cached news content. Returns text or None."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT content FROM ai_news_cache WHERE news_type = %s",
+                (news_type,)
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
+def get_cached_news_time(news_type):
+    """Get the last update time of cached news. Returns datetime or None."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT updated_at FROM ai_news_cache WHERE news_type = %s",
+                (news_type,)
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
 
 
 # ---------------------------------------------------------------------------
