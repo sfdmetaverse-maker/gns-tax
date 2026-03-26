@@ -397,6 +397,17 @@ def update_last_login(user_id):
             cur.execute("UPDATE users SET last_login = NOW() WHERE id = %s", (user_id,))
 
 
+def get_all_telegram_chat_ids():
+    """Return list of all distinct telegram_chat_id values (non-null)."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT telegram_chat_id FROM users "
+                "WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id != ''"
+            )
+            return [row[0] for row in cur.fetchall()]
+
+
 # ---------------------------------------------------------------------------
 # Business Settings (scoped to org_id)
 # ---------------------------------------------------------------------------

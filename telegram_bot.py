@@ -253,6 +253,19 @@ def _ocr_receipts(image_bytes, media_type, api_key):
         return None
 
 
+def _handle_ainews(chat_id):
+    """Handle the /ainews command — send today's AI news digest."""
+    _send_message(chat_id, "Researching today's AI news... This may take a moment.")
+    try:
+        from daily_ai_news import send_daily_news
+        digest = send_daily_news(chat_ids=[str(chat_id)])
+        if not digest:
+            _send_message(chat_id, "Sorry, couldn't fetch AI news right now. Try again later.")
+    except Exception as e:
+        logger.error("AI news fetch failed: %s", e)
+        _send_message(chat_id, "Something went wrong fetching AI news. Try again later.")
+
+
 def _handle_start(chat_id):
     """Handle the /start command."""
     _send_message(chat_id, (
@@ -263,6 +276,8 @@ def _handle_start(chat_id):
         "- Receipt photos (single or multiple receipts in one image)\n"
         "- PDF receipts or bank/credit card statements\n"
         "- CSV bank/credit card exports\n\n"
+        "Commands:\n"
+        "  /ainews — get today's AI news digest\n\n"
         "I'll process them and add transactions to your account automatically."
     ))
 
@@ -593,6 +608,8 @@ def telegram_webhook():
         elif text.startswith("/link"):
             args = text[len("/link"):].strip()
             _handle_link(chat_id, args)
+        elif text.startswith("/ainews"):
+            _handle_ainews(chat_id)
         elif message.get("photo"):
             _handle_photo(chat_id, message)
         elif message.get("document"):
