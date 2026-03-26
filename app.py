@@ -43,6 +43,9 @@ auth.init_app(app)
 from telegram_bot import telegram_bp
 app.register_blueprint(telegram_bp)
 
+from daily_ai_news import ai_news_bp
+app.register_blueprint(ai_news_bp)
+
 db.init_db()
 
 
@@ -2089,7 +2092,7 @@ def _start_news_scheduler():
 
 
 # Start scheduler when running under gunicorn (not in debug/reloader)
-if not app.debug and os.environ.get("TELEGRAM_BOT_TOKEN"):
+if not app.debug and os.environ.get("AI_NEWS_BOT_TOKEN"):
     _start_news_scheduler()
 
 
