@@ -99,6 +99,53 @@ def _tg_send(chat_id, text, token=None):
 # News generation
 # ---------------------------------------------------------------------------
 
+def fetch_top5_news():
+    """Fetch a quick top-5 AI news summary for welcome messages."""
+    try:
+        import anthropic
+    except ImportError:
+        return None
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_display = datetime.now().strftime("%B %d, %Y")
+    sources_list = "\n".join(f"- {s}" for s in NEWS_SOURCES)
+
+    prompt = f"""Today is {today}. Find the 5 most important AI news stories from the past 24-48 hours.
+
+Search these sources:
+{sources_list}
+
+Return EXACTLY this format for Telegram (use *bold* not **bold**):
+
+*Top 5 AI News — {today_display}*
+
+1. *Headline* — one sentence summary (source)
+2. *Headline* — one sentence summary (source)
+3. *Headline* — one sentence summary (source)
+4. *Headline* — one sentence summary (source)
+5. *Headline* — one sentence summary (source)
+
+Use /ainews for the full daily digest.
+
+Keep it very concise. Include source name but no URLs."""
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        msg = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=800,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text
+    except Exception as e:
+        logger.error("Top 5 news fetch failed: %s", e)
+        return None
+
+
 def fetch_ai_news_digest():
     """Use Claude to research and compile today's AI news digest."""
     try:
@@ -185,16 +232,27 @@ def save_digest_to_file(digest, base_dir="daily-ai-news"):
 # Telegram bot webhook handlers
 # ---------------------------------------------------------------------------
 
-def _handle_start(chat_id, first_name):
+def _handle_start(chat_id, first_name, username):
+    # Auto-subscribe on start
+    if not db.is_ai_news_subscriber(str(chat_id)):
+        db.add_ai_news_subscriber(str(chat_id), first_name, username)
+
     _tg_send(chat_id, (
         f"Hi {first_name}! Welcome to *Daily AI News* bot.\n\n"
-        "I send a curated AI news digest every day at 9:30 AM ET.\n\n"
+        "You're now subscribed! You'll get a curated AI digest every day at 9:30 AM ET.\n\n"
         "Commands:\n"
-        "/subscribe — start receiving daily news\n"
-        "/unsubscribe — stop receiving daily news\n"
-        "/ainews — get today's digest right now\n"
-        "/status — check your subscription\n"
+        "/ainews — get today's full digest\n"
+        "/unsubscribe — stop daily news\n"
+        "/status — check your subscription\n\n"
+        "Fetching today's top 5 stories for you..."
     ))
+
+    # Send today's top 5 as welcome
+    top5 = fetch_top5_news()
+    if top5:
+        _tg_send(chat_id, top5)
+    else:
+        _tg_send(chat_id, "Couldn't fetch today's news right now. Try /ainews later.")
 
 
 def _handle_subscribe(chat_id, first_name, username):
@@ -248,7 +306,7 @@ def ai_news_webhook():
 
     try:
         if text.startswith("/start"):
-            _handle_start(chat_id, first_name)
+            _handle_start(chat_id, first_name, username)
         elif text.startswith("/subscribe"):
             _handle_subscribe(chat_id, first_name, username)
         elif text.startswith("/unsubscribe"):
