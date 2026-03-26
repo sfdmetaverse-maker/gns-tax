@@ -2058,37 +2058,67 @@ def api_daily_ai_news():
 
 
 def _start_news_scheduler():
-    """Start APScheduler for daily AI news at 9:30 AM ET."""
+    """Start APScheduler for news refresh (every 6h) and daily push (9:30 AM ET)."""
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
+        from apscheduler.triggers.interval import IntervalTrigger
         import pytz
     except ImportError:
         logger.warning("APScheduler not installed — daily AI news scheduler disabled. "
                        "Install with: pip install apscheduler pytz")
         return
 
-    def _daily_news_job():
+    def _refresh_news_job():
+        """Fetch fresh news and cache in DB — runs every 6 hours."""
+        with app.app_context():
+            from daily_ai_news import refresh_cached_news
+            logger.info("Running 6-hour news refresh job")
+            refresh_cached_news()
+
+    def _daily_push_job():
+        """Push cached digest to all subscribers — runs at 9:30 AM ET."""
         with app.app_context():
             from daily_ai_news import send_daily_news, save_digest_to_file
-            logger.info("Running scheduled daily AI news job")
+            logger.info("Running daily news push to subscribers")
             digest = send_daily_news()
             if digest:
                 save_digest_to_file(digest)
                 logger.info("Daily AI news sent and saved")
             else:
-                logger.error("Daily AI news job failed to generate digest")
+                logger.error("Daily AI news push failed")
 
     et = pytz.timezone("America/New_York")
     scheduler = BackgroundScheduler()
+
+    # Refresh news cache every 6 hours
     scheduler.add_job(
-        _daily_news_job,
-        CronTrigger(hour=9, minute=30, timezone=et),
-        id="daily_ai_news",
+        _refresh_news_job,
+        IntervalTrigger(hours=6),
+        id="refresh_ai_news",
         replace_existing=True,
     )
+
+    # Push to subscribers at 9:30 AM ET daily
+    scheduler.add_job(
+        _daily_push_job,
+        CronTrigger(hour=9, minute=30, timezone=et),
+        id="daily_ai_news_push",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info("Daily AI news scheduler started — 9:30 AM ET daily")
+    logger.info("AI news scheduler started — refresh every 6h, push at 9:30 AM ET")
+
+    # Seed the cache on first boot if empty
+    import threading
+    def _initial_seed():
+        with app.app_context():
+            from daily_ai_news import get_cached_top5, refresh_cached_news
+            if not get_cached_top5():
+                logger.info("No cached news found — seeding on startup")
+                refresh_cached_news()
+    threading.Thread(target=_initial_seed, daemon=True).start()
 
 
 # Start scheduler when running under gunicorn (not in debug/reloader)
