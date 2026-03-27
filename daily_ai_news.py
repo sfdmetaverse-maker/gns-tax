@@ -100,8 +100,8 @@ def _tg_send(chat_id, text, token=None):
 # News generation + caching
 # ---------------------------------------------------------------------------
 
-def _call_claude(prompt, max_tokens=4000):
-    """Make a Claude API call with web search. Handles multi-turn tool use."""
+def _call_claude(prompt, max_tokens=16000):
+    """Make a Claude API call with web search (server-side tool)."""
     try:
         import anthropic
     except ImportError:
@@ -117,41 +117,31 @@ def _call_claude(prompt, max_tokens=4000):
     messages = [{"role": "user", "content": prompt}]
 
     try:
-        # Loop to handle multi-turn web search tool use
-        for _ in range(10):  # max 10 rounds of tool use
+        # Web search is a SERVER-SIDE tool — Anthropic handles search internally.
+        # We only need to handle "pause_turn" (server hit iteration limit).
+        for _ in range(5):
             msg = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=max_tokens,
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 messages=messages,
             )
 
             if msg.stop_reason == "end_turn":
-                # Done — extract all text blocks
-                text_parts = [b.text for b in msg.content if hasattr(b, "text")]
-                return "\n".join(text_parts) if text_parts else None
+                break
 
-            # Model wants to use a tool — add assistant response and tool results
-            messages.append({"role": "assistant", "content": msg.content})
+            if msg.stop_reason == "pause_turn":
+                # Server-side loop hit limit — re-send to continue
+                messages = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": msg.content},
+                ]
+                continue
 
-            # Build tool results for each tool_use block
-            tool_results = []
-            for block in msg.content:
-                if block.type == "tool_use":
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": "Search completed. Please provide your response based on the search results.",
-                    })
+            # Any other stop reason — done
+            break
 
-            if not tool_results:
-                # No tool use blocks but not end_turn — extract text anyway
-                text_parts = [b.text for b in msg.content if hasattr(b, "text")]
-                return "\n".join(text_parts) if text_parts else None
-
-            messages.append({"role": "user", "content": tool_results})
-
-        # If we hit max rounds, extract whatever text we have
+        # Extract text blocks from response (skip server tool blocks)
         text_parts = [b.text for b in msg.content if hasattr(b, "text")]
         return "\n".join(text_parts) if text_parts else None
 
