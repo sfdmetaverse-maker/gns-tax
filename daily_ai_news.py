@@ -291,12 +291,13 @@ def _handle_start(chat_id, first_name, username):
         "/status — check your subscription\n"
     ))
 
-    # Send cached top 5 instantly
+    # Send cached top 5 instantly, or trigger background refresh
     top5 = get_cached_top5()
     if top5:
         _tg_send(chat_id, top5)
     else:
-        _tg_send(chat_id, "News is being prepared. Use /ainews shortly to get the latest digest.")
+        _tg_send(chat_id, "Fetching today's top AI news — one moment...")
+        _trigger_background_refresh()
 
 
 def _handle_subscribe(chat_id, first_name, username):
@@ -332,12 +333,34 @@ def _handle_status(chat_id):
         _tg_send(chat_id, "You are not subscribed.\nUse /subscribe to start receiving daily AI news.")
 
 
+def _trigger_background_refresh():
+    """Trigger a background news refresh if cache is empty."""
+    import threading
+    def _do_refresh():
+        try:
+            logger.info("Background refresh triggered by user request")
+            refresh_cached_news()
+        except Exception as e:
+            logger.error("Background refresh failed: %s", e)
+    threading.Thread(target=_do_refresh, daemon=True).start()
+
+
 def _handle_ainews(chat_id):
     digest = get_cached_digest()
     if digest:
         _tg_send(chat_id, digest)
     else:
-        _tg_send(chat_id, "News is being prepared. Please try again in a few minutes.")
+        _tg_send(chat_id, "Fetching today's AI news now — this takes about 30 seconds. I'll send it shortly!")
+        _trigger_background_refresh()
+        # Wait and check for the result
+        import time
+        for _ in range(6):
+            time.sleep(10)
+            digest = get_cached_digest()
+            if digest:
+                _tg_send(chat_id, digest)
+                return
+        _tg_send(chat_id, "Still working on it. Please try /ainews again in a minute.")
 
 
 @ai_news_bp.route("/webhook/ai-news", methods=["POST"])

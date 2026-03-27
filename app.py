@@ -2122,8 +2122,15 @@ def _start_news_scheduler():
 
 
 # Start scheduler when running under gunicorn (not in debug/reloader)
-if not app.debug and os.environ.get("AI_NEWS_BOT_TOKEN"):
+_has_ai_token = bool(os.environ.get("AI_NEWS_BOT_TOKEN"))
+logger.info("AI News startup check: debug=%s, AI_NEWS_BOT_TOKEN set=%s", app.debug, _has_ai_token)
+if not app.debug and _has_ai_token:
     _start_news_scheduler()
+else:
+    if app.debug:
+        logger.info("AI News scheduler skipped: running in debug mode")
+    if not _has_ai_token:
+        logger.warning("AI News scheduler skipped: AI_NEWS_BOT_TOKEN not set")
 
 
 if __name__ == "__main__":
