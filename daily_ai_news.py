@@ -101,7 +101,7 @@ def _tg_send(chat_id, text, token=None):
 # ---------------------------------------------------------------------------
 
 def _call_claude(prompt, max_tokens=4000):
-    """Make a Claude API call. Returns text or None."""
+    """Make a Claude API call with web search. Handles multi-turn tool use."""
     try:
         import anthropic
     except ImportError:
@@ -114,16 +114,47 @@ def _call_claude(prompt, max_tokens=4000):
         return None
 
     client = anthropic.Anthropic(api_key=api_key)
+    messages = [{"role": "user", "content": prompt}]
+
     try:
-        msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=max_tokens,
-            tools=[{"type": "web_search_20250305"}],
-            messages=[{"role": "user", "content": prompt}],
-        )
-        # Extract text blocks from response (skip tool use/result blocks)
-        text_parts = [block.text for block in msg.content if hasattr(block, "text")]
+        # Loop to handle multi-turn web search tool use
+        for _ in range(10):  # max 10 rounds of tool use
+            msg = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=max_tokens,
+                tools=[{"type": "web_search_20250305"}],
+                messages=messages,
+            )
+
+            if msg.stop_reason == "end_turn":
+                # Done — extract all text blocks
+                text_parts = [b.text for b in msg.content if hasattr(b, "text")]
+                return "\n".join(text_parts) if text_parts else None
+
+            # Model wants to use a tool — add assistant response and tool results
+            messages.append({"role": "assistant", "content": msg.content})
+
+            # Build tool results for each tool_use block
+            tool_results = []
+            for block in msg.content:
+                if block.type == "tool_use":
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": "Search completed. Please provide your response based on the search results.",
+                    })
+
+            if not tool_results:
+                # No tool use blocks but not end_turn — extract text anyway
+                text_parts = [b.text for b in msg.content if hasattr(b, "text")]
+                return "\n".join(text_parts) if text_parts else None
+
+            messages.append({"role": "user", "content": tool_results})
+
+        # If we hit max rounds, extract whatever text we have
+        text_parts = [b.text for b in msg.content if hasattr(b, "text")]
         return "\n".join(text_parts) if text_parts else None
+
     except Exception as e:
         logger.error("Claude API call failed: %s", e)
         return None
