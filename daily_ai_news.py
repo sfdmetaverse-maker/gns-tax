@@ -23,6 +23,14 @@ ai_news_bp = Blueprint("ai_news", __name__)
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
+# Supported languages: code -> (display name, Google Translate code)
+LANGUAGES = {
+    "en": ("English", "en"),
+    "zh-TW": ("繁體中文", "zh-TW"),
+    "fr": ("Français", "fr"),
+    "de": ("Deutsch", "de"),
+}
+
 # RSS feeds for AI news (free, no API key needed)
 RSS_FEEDS = {
     "TechCrunch AI": "https://techcrunch.com/category/artificial-intelligence/feed/",
@@ -97,6 +105,73 @@ def _tg_send(chat_id, text, token=None):
                 }, timeout=30)
             except Exception:
                 pass
+
+
+def _translate_text(text, target_lang):
+    """Translate text using Google Translate (free). Returns translated text."""
+    if target_lang == "en":
+        return text
+    try:
+        from deep_translator import GoogleTranslator
+        # Split into chunks of ~4500 chars (Google Translate limit is ~5000)
+        chunks = []
+        while len(text) > 4500:
+            split_at = text.rfind("\n", 0, 4500)
+            if split_at < 100:
+                split_at = 4500
+            chunks.append(text[:split_at])
+            text = text[split_at:]
+        chunks.append(text)
+
+        translated_parts = []
+        translator = GoogleTranslator(source="en", target=target_lang)
+        for chunk in chunks:
+            translated_parts.append(translator.translate(chunk))
+
+        return "\n".join(translated_parts)
+    except Exception as e:
+        logger.error("Translation to %s failed: %s", target_lang, e)
+        return text  # Return original on failure
+
+
+def _get_news_for_lang(news_type, lang):
+    """Get cached news, translated if needed. Caches translations too."""
+    if lang == "en":
+        return db.get_cached_news(news_type)
+
+    # Check for cached translation
+    cache_key = f"{news_type}_{lang}"
+    cached = db.get_cached_news(cache_key)
+    if cached:
+        return cached
+
+    # Translate from English and cache
+    english = db.get_cached_news(news_type)
+    if not english:
+        return None
+
+    translated = _translate_text(english, lang)
+    if translated and translated != english:
+        db.save_cached_news(cache_key, translated)
+        logger.info("Cached %s translation (%d chars)", cache_key, len(translated))
+    return translated
+
+
+def _tg_send_inline_keyboard(chat_id, text, keyboard):
+    """Send a message with an inline keyboard."""
+    token = _bot_token()
+    if not token:
+        return
+    url = TELEGRAM_API.format(token=token, method="sendMessage")
+    try:
+        requests.post(url, json={
+            "chat_id": chat_id,
+            "text": text,
+            "reply_markup": {"inline_keyboard": keyboard},
+            "parse_mode": "Markdown",
+        }, timeout=30)
+    except Exception as e:
+        logger.error("Failed to send inline keyboard: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +422,7 @@ def get_cached_digest():
 
 
 def send_daily_news(chat_ids=None):
-    """Send cached digest to chat IDs, or all subscribers."""
+    """Send cached digest to all subscribers in their preferred language."""
     digest = get_cached_digest()
     if not digest:
         refresh_cached_news()
@@ -360,11 +435,19 @@ def send_daily_news(chat_ids=None):
     token = _bot_token()
 
     if chat_ids is None:
-        chat_ids = db.get_ai_news_subscribers()
-
-    for chat_id in chat_ids:
-        _tg_send(chat_id, digest, token)
-        logger.info("Sent daily AI news to chat_id=%s", chat_id)
+        # Get subscribers with their language preferences
+        subs = db.get_subscribers_with_lang()
+        for chat_id, lang in subs:
+            text = _get_news_for_lang("digest", lang)
+            if text:
+                _tg_send(chat_id, text, token)
+                logger.info("Sent daily AI news to chat_id=%s (lang=%s)", chat_id, lang)
+    else:
+        for chat_id in chat_ids:
+            lang = db.get_subscriber_lang(chat_id)
+            text = _get_news_for_lang("digest", lang)
+            if text:
+                _tg_send(chat_id, text, token)
 
     return digest
 
@@ -395,12 +478,14 @@ def _handle_start(chat_id, first_name, username):
         "You're now subscribed! You'll get a curated AI digest every day at 9:30 AM ET.\n\n"
         "Commands:\n"
         "/ainews — get today's full digest\n"
+        "/language — choose your language\n"
         "/unsubscribe — stop daily news\n"
         "/status — check your subscription\n"
     ))
 
     # Send cached top 5 instantly, or fetch fresh
-    top5 = get_cached_top5()
+    lang = db.get_subscriber_lang(str(chat_id))
+    top5 = _get_news_for_lang("top5", lang)
     if top5:
         _tg_send(chat_id, top5)
     else:
@@ -430,27 +515,30 @@ def _handle_status(chat_id):
     count = db.count_ai_news_subscribers()
     updated = db.get_cached_news_time("top5")
     time_str = updated.strftime("%Y-%m-%d %H:%M ET") if updated else "never"
+    lang = db.get_subscriber_lang(str(chat_id))
+    lang_name = LANGUAGES.get(lang, ("English",))[0]
     if is_sub:
         _tg_send(chat_id, (
             f"You are subscribed.\n"
+            f"Language: {lang_name}\n"
             f"Total subscribers: {count}\n"
             f"Last news update: {time_str}\n"
-            f"News refreshes every 6 hours."
+            f"News refreshes every 6 hours.\n"
+            f"Use /language to change language."
         ))
     else:
         _tg_send(chat_id, "You are not subscribed.\nUse /subscribe to start receiving daily AI news.")
 
 
 def _trigger_refresh_and_send(chat_id, news_type="digest"):
-    """Refresh news in background and send to user when ready."""
+    """Refresh news in background and send to user in their language."""
+    lang = db.get_subscriber_lang(str(chat_id))
+
     def _do_refresh():
         try:
-            logger.info("Background refresh triggered for chat_id=%s", chat_id)
+            logger.info("Background refresh triggered for chat_id=%s (lang=%s)", chat_id, lang)
             refresh_cached_news()
-            if news_type == "top5":
-                text = get_cached_top5()
-            else:
-                text = get_cached_digest()
+            text = _get_news_for_lang(news_type, lang)
             if text:
                 _tg_send(chat_id, text)
             else:
@@ -461,8 +549,28 @@ def _trigger_refresh_and_send(chat_id, news_type="digest"):
     threading.Thread(target=_do_refresh, daemon=True).start()
 
 
+def _handle_language(chat_id):
+    """Show language selection inline keyboard."""
+    keyboard = []
+    for code, (name, _) in LANGUAGES.items():
+        keyboard.append([{"text": name, "callback_data": f"lang:{code}"}])
+    _tg_send_inline_keyboard(chat_id, "Choose your news language:", keyboard)
+
+
+def _handle_lang_callback(chat_id, lang_code):
+    """Set user's language preference from callback."""
+    if lang_code not in LANGUAGES:
+        return
+    db.set_subscriber_lang(str(chat_id), lang_code)
+    lang_name = LANGUAGES[lang_code][0]
+    _tg_send(chat_id, f"Language set to *{lang_name}*.\nYour next /ainews will be in {lang_name}.")
+    # Clear cached translations so they refresh
+    logger.info("Language set to %s for chat_id=%s", lang_code, chat_id)
+
+
 def _handle_ainews(chat_id):
-    digest = get_cached_digest()
+    lang = db.get_subscriber_lang(str(chat_id))
+    digest = _get_news_for_lang("digest", lang)
     if digest:
         _tg_send(chat_id, digest)
     else:
@@ -475,6 +583,24 @@ def ai_news_webhook():
     """Handle incoming Telegram webhook for the AI News bot."""
     data = flask_request.get_json(silent=True)
     if not data:
+        return jsonify({"ok": True}), 200
+
+    # Handle callback queries (inline keyboard button presses)
+    callback = data.get("callback_query")
+    if callback:
+        cb_chat_id = callback["message"]["chat"]["id"]
+        cb_data = callback.get("data", "")
+        try:
+            if cb_data.startswith("lang:"):
+                lang_code = cb_data.split(":", 1)[1]
+                _handle_lang_callback(cb_chat_id, lang_code)
+            # Answer the callback to remove loading state
+            token = _bot_token()
+            if token:
+                url = TELEGRAM_API.format(token=token, method="answerCallbackQuery")
+                requests.post(url, json={"callback_query_id": callback["id"]}, timeout=10)
+        except Exception as e:
+            logger.error("Callback query error: %s", e, exc_info=True)
         return jsonify({"ok": True}), 200
 
     message = data.get("message")
@@ -495,6 +621,8 @@ def ai_news_webhook():
             _handle_unsubscribe(chat_id)
         elif text.startswith("/ainews"):
             _handle_ainews(chat_id)
+        elif text.startswith("/language"):
+            _handle_language(chat_id)
         elif text.startswith("/status"):
             _handle_status(chat_id)
         else:
@@ -503,6 +631,7 @@ def ai_news_webhook():
                 "/subscribe — start receiving daily AI news\n"
                 "/unsubscribe — stop daily news\n"
                 "/ainews — get today's digest now\n"
+                "/language — choose your language\n"
                 "/status — check subscription"
             ))
     except Exception as e:

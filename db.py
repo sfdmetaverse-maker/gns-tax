@@ -231,6 +231,12 @@ def _apply_migrations():
                 )
             """)
 
+            # 15a. Add language preference column to ai_news_subscribers
+            cur.execute("""
+                ALTER TABLE ai_news_subscribers
+                ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT 'en'
+            """)
+
             # 15. Create ai_news_cache table for storing pre-fetched news
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS ai_news_cache (
@@ -480,6 +486,38 @@ def count_ai_news_subscribers():
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM ai_news_subscribers WHERE is_active = TRUE")
             return cur.fetchone()[0]
+
+
+def set_subscriber_lang(chat_id, lang):
+    """Set language preference for a subscriber."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ai_news_subscribers SET lang = %s WHERE chat_id = %s",
+                (lang, str(chat_id))
+            )
+
+
+def get_subscriber_lang(chat_id):
+    """Get language preference for a subscriber. Returns 'en' by default."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT lang FROM ai_news_subscribers WHERE chat_id = %s",
+                (str(chat_id),)
+            )
+            row = cur.fetchone()
+            return row[0] if row else "en"
+
+
+def get_subscribers_with_lang():
+    """Return list of (chat_id, lang) for active subscribers."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT chat_id, lang FROM ai_news_subscribers WHERE is_active = TRUE"
+            )
+            return cur.fetchall()
 
 
 # ---------------------------------------------------------------------------
