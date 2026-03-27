@@ -162,10 +162,10 @@ def _get_news_for_lang(news_type, lang):
     if lang == "en":
         return db.get_cached_news(news_type)
 
-    # Check for cached translation
+    # Check for cached translation (skip if empty — cleared on refresh)
     cache_key = f"{news_type}_{lang}"
     cached = db.get_cached_news(cache_key)
-    if cached:
+    if cached and cached.strip():
         return cached
 
     # Translate from English and cache
@@ -430,6 +430,18 @@ def _build_digest_from_articles(articles):
     return "\n".join(lines)
 
 
+def _is_cache_stale(max_age_hours=6):
+    """Check if cached news is older than max_age_hours."""
+    updated = db.get_cached_news_time("digest")
+    if not updated:
+        return True
+    # Make both timezone-aware for comparison
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - updated
+    return age > timedelta(hours=max_age_hours)
+
+
 def refresh_cached_news():
     """Fetch fresh news from RSS feeds and cache in DB."""
     logger.info("Refreshing cached AI news from RSS feeds...")
@@ -450,6 +462,16 @@ def refresh_cached_news():
     if digest:
         db.save_cached_news("digest", digest)
         logger.info("Cached full digest updated (%d chars)", len(digest))
+
+    # Clear old translated caches so they regenerate from fresh English
+    for lang_code in LANGUAGES:
+        if lang_code != "en":
+            for ntype in ("top5", "digest"):
+                cache_key = f"{ntype}_{lang_code}"
+                try:
+                    db.save_cached_news(cache_key, "")
+                except Exception:
+                    pass
 
     return top5, digest
 
@@ -526,14 +548,18 @@ def _handle_start(chat_id, first_name, username):
         "/status — check your subscription\n"
     ))
 
-    # Send cached top 5 instantly, or fetch fresh
+    # Send cached top 5 instantly, or fetch fresh if stale/empty
     lang = db.get_subscriber_lang(str(chat_id))
-    top5 = _get_news_for_lang("top5", lang)
-    if top5:
-        _tg_send(chat_id, top5)
-    else:
+    if _is_cache_stale():
         _tg_send(chat_id, "Fetching today's top AI news — one moment...")
         _trigger_refresh_and_send(chat_id, "top5")
+    else:
+        top5 = _get_news_for_lang("top5", lang)
+        if top5:
+            _tg_send(chat_id, top5)
+        else:
+            _tg_send(chat_id, "Fetching today's top AI news — one moment...")
+            _trigger_refresh_and_send(chat_id, "top5")
 
 
 def _handle_subscribe(chat_id, first_name, username):
@@ -613,12 +639,17 @@ def _handle_lang_callback(chat_id, lang_code):
 
 def _handle_ainews(chat_id):
     lang = db.get_subscriber_lang(str(chat_id))
-    digest = _get_news_for_lang("digest", lang)
-    if digest:
-        _tg_send(chat_id, digest)
-    else:
-        _tg_send(chat_id, "Fetching today's AI news now — one moment...")
+    # If cache is stale (>6h old) or empty, refresh first
+    if _is_cache_stale():
+        _tg_send(chat_id, "Fetching fresh AI news — one moment...")
         _trigger_refresh_and_send(chat_id, "digest")
+    else:
+        digest = _get_news_for_lang("digest", lang)
+        if digest:
+            _tg_send(chat_id, digest)
+        else:
+            _tg_send(chat_id, "Fetching today's AI news now — one moment...")
+            _trigger_refresh_and_send(chat_id, "digest")
 
 
 @ai_news_bp.route("/webhook/ai-news", methods=["POST"])
