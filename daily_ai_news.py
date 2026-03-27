@@ -100,8 +100,8 @@ def _tg_send(chat_id, text, token=None):
 # News generation + caching
 # ---------------------------------------------------------------------------
 
-def _call_claude(prompt, max_tokens=4000):
-    """Make a Claude API call. Returns text or None."""
+def _call_claude(prompt, max_tokens=16000):
+    """Make a Claude API call with web search (server-side tool)."""
     try:
         import anthropic
     except ImportError:
@@ -114,18 +114,49 @@ def _call_claude(prompt, max_tokens=4000):
         return None
 
     client = anthropic.Anthropic(api_key=api_key)
+    messages = [{"role": "user", "content": prompt}]
+
     try:
-        msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=max_tokens,
-            tools=[{"type": "web_search_20250305"}],
-            messages=[{"role": "user", "content": prompt}],
-        )
-        # Extract text blocks from response (skip tool use/result blocks)
-        text_parts = [block.text for block in msg.content if hasattr(block, "text")]
-        return "\n".join(text_parts) if text_parts else None
+        # Server-side web search + fetch tools (20260209 supports dynamic filtering on Sonnet 4.6)
+        tools = [
+            {"type": "web_search_20260209", "name": "web_search"},
+            {"type": "web_fetch_20260209", "name": "web_fetch"},
+        ]
+
+        for attempt in range(5):
+            logger.info("Claude API call attempt %d, messages=%d", attempt + 1, len(messages))
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=max_tokens,
+                tools=tools,
+                messages=messages,
+            )
+            logger.info("Claude API response: stop_reason=%s, blocks=%d",
+                        msg.stop_reason, len(msg.content))
+
+            if msg.stop_reason == "end_turn":
+                break
+
+            if msg.stop_reason == "pause_turn":
+                messages = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": msg.content},
+                ]
+                continue
+
+            break
+
+        text_parts = [b.text for b in msg.content if hasattr(b, "text")]
+        result = "\n".join(text_parts) if text_parts else None
+        if result:
+            logger.info("Claude returned %d chars of text", len(result))
+        else:
+            logger.warning("Claude returned no text blocks. Block types: %s",
+                           [b.type for b in msg.content])
+        return result
+
     except Exception as e:
-        logger.error("Claude API call failed: %s", e)
+        logger.error("Claude API call failed: %s", e, exc_info=True)
         return None
 
 
