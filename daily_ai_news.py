@@ -42,12 +42,35 @@ RSS_FEEDS = {
     "Ars Technica AI": "https://feeds.arstechnica.com/arstechnica/technology-lab",
     "The Verge AI": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
     "Wired AI": "https://www.wired.com/feed/tag/ai/latest/rss",
+    "HuggingFace Papers": "https://huggingface.co/papers/rss",
 }
 
 # Reddit JSON endpoints (no auth needed, just add .json)
 REDDIT_FEEDS = {
     "r/artificial": "https://www.reddit.com/r/artificial/hot.json?limit=10",
     "r/LocalLLaMA": "https://www.reddit.com/r/LocalLLaMA/hot.json?limit=10",
+}
+
+# Filter out political / non-tech content
+SKIP_KEYWORDS = {
+    "trump", "biden", "congress", "senate", "democrat", "republican",
+    "election", "legislation", "lawmaker", "white house", "executive order",
+    "political", "politician", "partisan", "lobbying", "geopolitics",
+    "tariff", "sanction", "immigration", "border wall", "gun control",
+    "abortion", "supreme court nomination",
+}
+
+# Boost articles about actual AI tech development
+TECH_BOOST_KEYWORDS = {
+    "model", "benchmark", "llm", "gpt", "claude", "gemini", "llama",
+    "open source", "fine-tuning", "training", "inference", "transformer",
+    "diffusion", "multimodal", "agent", "rag", "embedding", "api",
+    "release", "launch", "update", "paper", "research", "architecture",
+    "gpu", "tpu", "cuda", "parameter", "token", "context window",
+    "dataset", "hugging face", "pytorch", "tensorflow", "weights",
+    "tool use", "function calling", "reasoning", "coding", "vision",
+    "robotics", "autonomous", "neural", "deep learning", "machine learning",
+    "startup", "funding", "product", "platform", "developer", "sdk",
 }
 
 
@@ -276,17 +299,31 @@ def _fetch_reddit_posts():
     return articles
 
 
-def _deduplicate_articles(articles):
-    """Remove duplicate articles based on similar titles."""
+def _is_political(title, summary):
+    """Check if article is political rather than AI tech."""
+    text = (title + " " + summary).lower()
+    return any(kw in text for kw in SKIP_KEYWORDS)
+
+
+def _tech_score(title, summary):
+    """Score how tech/AI-focused an article is. Higher = more relevant."""
+    text = (title + " " + summary).lower()
+    return sum(1 for kw in TECH_BOOST_KEYWORDS if kw in text)
+
+
+def _filter_and_deduplicate(articles):
+    """Filter out political content, deduplicate, and sort by tech relevance."""
+    # Filter out political articles
+    filtered = [a for a in articles if not _is_political(a["title"], a.get("summary", ""))]
+    logger.info("Filtered %d political articles (kept %d)", len(articles) - len(filtered), len(filtered))
+
+    # Deduplicate
     seen_titles = set()
     unique = []
-    for a in articles:
-        # Normalize title for comparison
+    for a in filtered:
         norm = a["title"].lower().strip()
-        # Skip if we've seen a very similar title
         is_dup = False
         for seen in seen_titles:
-            # Simple overlap check — if 60%+ words match, skip
             words_a = set(norm.split())
             words_b = set(seen.split())
             if len(words_a & words_b) > 0.6 * max(len(words_a), len(words_b), 1):
@@ -294,7 +331,13 @@ def _deduplicate_articles(articles):
                 break
         if not is_dup:
             seen_titles.add(norm)
+            a["_tech_score"] = _tech_score(a["title"], a.get("summary", ""))
             unique.append(a)
+
+    # Sort by tech score (higher first), then by date
+    unique.sort(key=lambda a: (a.get("_tech_score", 0),
+                                a["date"] or datetime.min.replace(tzinfo=timezone.utc)),
+                reverse=True)
     return unique
 
 
@@ -393,7 +436,7 @@ def refresh_cached_news():
 
     rss_articles = _fetch_rss_articles()
     reddit_articles = _fetch_reddit_posts()
-    all_articles = _deduplicate_articles(rss_articles + reddit_articles)
+    all_articles = _filter_and_deduplicate(rss_articles + reddit_articles)
 
     logger.info("Fetched %d articles (%d RSS + %d Reddit, %d after dedup)",
                 len(all_articles), len(rss_articles), len(reddit_articles), len(all_articles))
