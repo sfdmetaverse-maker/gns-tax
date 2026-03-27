@@ -117,36 +117,46 @@ def _call_claude(prompt, max_tokens=16000):
     messages = [{"role": "user", "content": prompt}]
 
     try:
-        # Web search is a SERVER-SIDE tool — Anthropic handles search internally.
-        # We only need to handle "pause_turn" (server hit iteration limit).
-        for _ in range(5):
+        # Server-side web search + fetch tools (20260209 supports dynamic filtering on Sonnet 4.6)
+        tools = [
+            {"type": "web_search_20260209", "name": "web_search"},
+            {"type": "web_fetch_20260209", "name": "web_fetch"},
+        ]
+
+        for attempt in range(5):
+            logger.info("Claude API call attempt %d, messages=%d", attempt + 1, len(messages))
             msg = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=max_tokens,
-                tools=[{"type": "web_search_20250305", "name": "web_search"}],
+                tools=tools,
                 messages=messages,
             )
+            logger.info("Claude API response: stop_reason=%s, blocks=%d",
+                        msg.stop_reason, len(msg.content))
 
             if msg.stop_reason == "end_turn":
                 break
 
             if msg.stop_reason == "pause_turn":
-                # Server-side loop hit limit — re-send to continue
                 messages = [
                     {"role": "user", "content": prompt},
                     {"role": "assistant", "content": msg.content},
                 ]
                 continue
 
-            # Any other stop reason — done
             break
 
-        # Extract text blocks from response (skip server tool blocks)
         text_parts = [b.text for b in msg.content if hasattr(b, "text")]
-        return "\n".join(text_parts) if text_parts else None
+        result = "\n".join(text_parts) if text_parts else None
+        if result:
+            logger.info("Claude returned %d chars of text", len(result))
+        else:
+            logger.warning("Claude returned no text blocks. Block types: %s",
+                           [b.type for b in msg.content])
+        return result
 
     except Exception as e:
-        logger.error("Claude API call failed: %s", e)
+        logger.error("Claude API call failed: %s", e, exc_info=True)
         return None
 
 
