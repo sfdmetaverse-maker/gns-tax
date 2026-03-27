@@ -1,14 +1,16 @@
 """Daily AI News Bot — separate Telegram bot for AI news digests.
 
 Uses its own bot token (AI_NEWS_BOT_TOKEN) and subscriber list.
-News is fetched every 6 hours and cached in the DB.
+News is fetched from RSS feeds every 6 hours and cached in the DB.
 Users get cached news instantly on /start or /ainews.
 Daily push to subscribers at 9:30 AM ET.
 """
 
 import logging
 import os
-from datetime import datetime
+import time as _time
+import threading
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, request as flask_request, jsonify
@@ -21,23 +23,24 @@ ai_news_bp = Blueprint("ai_news", __name__)
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
-NEWS_SOURCES = [
-    "The Rundown AI (therundownai.com)",
-    "TLDR AI (tldr.tech/ai)",
-    "Ben's Bites (bensbites.co)",
-    "Import AI (importai.substack.com)",
-    "MIT Technology Review AI",
-    "VentureBeat AI",
-    "TechCrunch AI",
-    "AI News (artificialintelligence-news.com)",
-    "Hugging Face trending papers",
-    "Reddit r/artificial and r/LocalLLaMA",
-    "Matt Wolfe / FutureTools YouTube",
-    "AI Explained YouTube",
-    "Latent Space podcast",
-    "Two Minute Papers YouTube",
-    "arXiv cs.AI recent",
-]
+# RSS feeds for AI news (free, no API key needed)
+RSS_FEEDS = {
+    "TechCrunch AI": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "VentureBeat AI": "https://venturebeat.com/category/ai/feed/",
+    "MIT Tech Review": "https://www.technologyreview.com/topic/artificial-intelligence/feed",
+    "AI News": "https://www.artificialintelligence-news.com/feed/",
+    "arXiv cs.AI": "https://rss.arxiv.org/rss/cs.AI",
+    "The Rundown AI": "https://www.therundownai.com/feed",
+    "Ars Technica AI": "https://feeds.arstechnica.com/arstechnica/technology-lab",
+    "The Verge AI": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+    "Wired AI": "https://www.wired.com/feed/tag/ai/latest/rss",
+}
+
+# Reddit JSON endpoints (no auth needed, just add .json)
+REDDIT_FEEDS = {
+    "r/artificial": "https://www.reddit.com/r/artificial/hot.json?limit=10",
+    "r/LocalLLaMA": "https://www.reddit.com/r/LocalLLaMA/hot.json?limit=10",
+}
 
 
 def _bot_token():
@@ -97,131 +100,238 @@ def _tg_send(chat_id, text, token=None):
 
 
 # ---------------------------------------------------------------------------
-# News generation + caching
+# RSS-based news fetching (free, no API credits needed)
 # ---------------------------------------------------------------------------
 
-def _call_claude(prompt, max_tokens=16000):
-    """Make a Claude API call with web search (server-side tool)."""
+def _parse_rss_date(entry):
+    """Extract a datetime from an RSS entry, return None if unparsable."""
+    import email.utils
+    for field in ("published", "updated"):
+        raw = getattr(entry, field, None) or entry.get(field)
+        if raw:
+            try:
+                parsed = email.utils.parsedate_to_datetime(raw)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed
+            except Exception:
+                pass
+    # feedparser's time struct
+    for field in ("published_parsed", "updated_parsed"):
+        ts = getattr(entry, field, None) or entry.get(field)
+        if ts:
+            try:
+                from calendar import timegm
+                return datetime.fromtimestamp(timegm(ts), tz=timezone.utc)
+            except Exception:
+                pass
+    return None
+
+
+def _fetch_rss_articles():
+    """Fetch recent articles from all RSS feeds. Returns list of dicts."""
     try:
-        import anthropic
+        import feedparser
     except ImportError:
-        logger.error("anthropic package not installed")
-        return None
+        logger.error("feedparser not installed — pip install feedparser")
+        return []
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        logger.error("ANTHROPIC_API_KEY not set")
-        return None
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    articles = []
 
-    client = anthropic.Anthropic(api_key=api_key)
-    messages = [{"role": "user", "content": prompt}]
+    for source_name, url in RSS_FEEDS.items():
+        try:
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:15]:
+                pub_date = _parse_rss_date(entry)
+                if pub_date and pub_date < cutoff:
+                    continue
+                title = entry.get("title", "").strip()
+                link = entry.get("link", "")
+                summary = entry.get("summary", "")
+                # Clean HTML tags from summary
+                import re
+                summary = re.sub(r"<[^>]+>", "", summary).strip()
+                if len(summary) > 200:
+                    summary = summary[:197] + "..."
+                if title:
+                    articles.append({
+                        "title": title,
+                        "link": link,
+                        "summary": summary,
+                        "source": source_name,
+                        "date": pub_date,
+                    })
+        except Exception as e:
+            logger.warning("Failed to fetch RSS from %s: %s", source_name, e)
 
-    try:
-        # Server-side web search + fetch tools (20260209 supports dynamic filtering on Sonnet 4.6)
-        tools = [
-            {"type": "web_search_20260209", "name": "web_search"},
-            {"type": "web_fetch_20260209", "name": "web_fetch"},
-        ]
+    return articles
 
-        for attempt in range(5):
-            logger.info("Claude API call attempt %d, messages=%d", attempt + 1, len(messages))
-            msg = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=max_tokens,
-                tools=tools,
-                messages=messages,
-            )
-            logger.info("Claude API response: stop_reason=%s, blocks=%d",
-                        msg.stop_reason, len(msg.content))
 
-            if msg.stop_reason == "end_turn":
+def _fetch_reddit_posts():
+    """Fetch top posts from AI subreddits."""
+    articles = []
+    headers = {"User-Agent": "DailyAINewsBot/1.0"}
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+
+    for source_name, url in REDDIT_FEEDS.items():
+        try:
+            resp = requests.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            for child in data.get("data", {}).get("children", []):
+                post = child.get("data", {})
+                created = datetime.fromtimestamp(post.get("created_utc", 0), tz=timezone.utc)
+                if created < cutoff:
+                    continue
+                title = post.get("title", "").strip()
+                link = f"https://reddit.com{post.get('permalink', '')}"
+                score = post.get("score", 0)
+                if title and score > 10:
+                    articles.append({
+                        "title": title,
+                        "link": link,
+                        "summary": f"({score} upvotes)",
+                        "source": source_name,
+                        "date": created,
+                    })
+        except Exception as e:
+            logger.warning("Failed to fetch Reddit %s: %s", source_name, e)
+
+    return articles
+
+
+def _deduplicate_articles(articles):
+    """Remove duplicate articles based on similar titles."""
+    seen_titles = set()
+    unique = []
+    for a in articles:
+        # Normalize title for comparison
+        norm = a["title"].lower().strip()
+        # Skip if we've seen a very similar title
+        is_dup = False
+        for seen in seen_titles:
+            # Simple overlap check — if 60%+ words match, skip
+            words_a = set(norm.split())
+            words_b = set(seen.split())
+            if len(words_a & words_b) > 0.6 * max(len(words_a), len(words_b), 1):
+                is_dup = True
                 break
+        if not is_dup:
+            seen_titles.add(norm)
+            unique.append(a)
+    return unique
 
-            if msg.stop_reason == "pause_turn":
-                messages = [
-                    {"role": "user", "content": prompt},
-                    {"role": "assistant", "content": msg.content},
-                ]
-                continue
 
-            break
+def _build_top5_from_articles(articles):
+    """Format top 5 articles as Telegram message."""
+    today_display = datetime.now().strftime("%B %d, %Y")
 
-        text_parts = [b.text for b in msg.content if hasattr(b, "text")]
-        result = "\n".join(text_parts) if text_parts else None
-        if result:
-            logger.info("Claude returned %d chars of text", len(result))
-        else:
-            logger.warning("Claude returned no text blocks. Block types: %s",
-                           [b.type for b in msg.content])
-        return result
-
-    except Exception as e:
-        logger.error("Claude API call failed: %s", e, exc_info=True)
+    if not articles:
         return None
 
+    # Sort by date (newest first), take top 5
+    articles = sorted(articles, key=lambda a: a["date"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    top = articles[:5]
 
-def _build_top5_prompt():
-    today = datetime.now().strftime("%Y-%m-%d")
+    lines = [f"*Top 5 AI News — {today_display}*\n"]
+    for i, a in enumerate(top, 1):
+        lines.append(f"{i}. *{a['title']}* — {a['summary']} ({a['source']})")
+
+    lines.append("\nUse /ainews for the full daily digest.")
+    return "\n".join(lines)
+
+
+def _build_digest_from_articles(articles):
+    """Format all articles as a comprehensive Telegram digest."""
     today_display = datetime.now().strftime("%B %d, %Y")
-    sources_list = "\n".join(f"- {s}" for s in NEWS_SOURCES)
-    return f"""Today is {today}. Find the 5 most important AI news stories from the past 24-48 hours.
 
-Search these sources:
-{sources_list}
+    if not articles:
+        return None
 
-Return EXACTLY this format for Telegram (use *bold* not **bold**):
+    # Sort by date (newest first)
+    articles = sorted(articles, key=lambda a: a["date"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
 
-*Top 5 AI News — {today_display}*
+    # Categorize by source type
+    top_stories = []
+    research = []
+    reddit_posts = []
+    other_news = []
 
-1. *Headline* — one sentence summary (source)
-2. *Headline* — one sentence summary (source)
-3. *Headline* — one sentence summary (source)
-4. *Headline* — one sentence summary (source)
-5. *Headline* — one sentence summary (source)
+    for a in articles:
+        src = a["source"]
+        if src == "arXiv cs.AI":
+            research.append(a)
+        elif src.startswith("r/"):
+            reddit_posts.append(a)
+        elif src in ("TechCrunch AI", "VentureBeat AI", "MIT Tech Review", "The Verge AI"):
+            top_stories.append(a)
+        else:
+            other_news.append(a)
 
-Use /ainews for the full daily digest.
+    lines = [f"*Daily AI News — {today_display}*\n"]
 
-Keep it very concise. Include source name but no URLs."""
+    # Top Stories
+    if top_stories:
+        lines.append("*TOP STORIES*")
+        for a in top_stories[:7]:
+            link_text = f"[Link]({a['link']})" if a["link"] else ""
+            lines.append(f"• *{a['title']}* — {a['summary']} ({a['source']}) {link_text}")
+        lines.append("")
 
+    # More News
+    if other_news:
+        lines.append("*MORE AI NEWS*")
+        for a in other_news[:7]:
+            link_text = f"[Link]({a['link']})" if a["link"] else ""
+            lines.append(f"• *{a['title']}* — {a['summary']} ({a['source']}) {link_text}")
+        lines.append("")
 
-def _build_digest_prompt():
-    today = datetime.now().strftime("%Y-%m-%d")
-    today_display = datetime.now().strftime("%B %d, %Y")
-    sources_list = "\n".join(f"- {s}" for s in NEWS_SOURCES)
-    return f"""Today is {today}. Research and compile the latest AI news from the past 24-48 hours.
+    # Research
+    if research:
+        lines.append("*RESEARCH (arXiv)*")
+        for a in research[:5]:
+            link_text = f"[Link]({a['link']})" if a["link"] else ""
+            lines.append(f"• {a['title']} {link_text}")
+        lines.append("")
 
-Search these sources and any other reliable AI news sources you can find:
-{sources_list}
+    # Reddit buzz
+    if reddit_posts:
+        lines.append("*REDDIT BUZZ*")
+        for a in reddit_posts[:5]:
+            link_text = f"[Link]({a['link']})" if a["link"] else ""
+            lines.append(f"• {a['title']} {a['summary']} {link_text}")
+        lines.append("")
 
-Create a comprehensive daily AI news digest with these sections:
+    # Sources footer
+    lines.append("*RECOMMENDED FOLLOWS*")
+    lines.append("Newsletters: The Rundown AI, TLDR AI, Ben's Bites, Import AI")
+    lines.append("YouTube: Matt Wolfe, AI Explained, Two Minute Papers")
+    lines.append("Podcasts: Latent Space")
 
-1. *TOP STORIES* (5-7 most important stories with brief descriptions and source links)
-2. *MODEL RELEASES & BENCHMARKS* (any new AI models, updates, or benchmark results)
-3. *TOOLS & PRODUCTS* (new AI tools, apps, or product launches)
-4. *FUNDING & BUSINESS* (funding rounds, acquisitions, business news)
-5. *RESEARCH* (notable papers or breakthroughs)
-6. *CREATOR CONTENT* (notable YouTube videos or podcast episodes from AI creators)
-7. *HOW THIS BENEFITS YOU* (2-3 bullet points on how today's news could benefit a small business owner who uses AI for automation)
-
-Format as clean Markdown suitable for Telegram (use *bold* not **bold**, use simple formatting).
-Include source URLs where possible.
-Keep it concise but comprehensive — aim for a 3-5 minute read.
-Start with: *Daily AI News — {today_display}*"""
+    return "\n".join(lines)
 
 
 def refresh_cached_news():
-    """Fetch fresh news from Claude and store in DB. Called every 6 hours."""
-    logger.info("Refreshing cached AI news...")
+    """Fetch fresh news from RSS feeds and cache in DB."""
+    logger.info("Refreshing cached AI news from RSS feeds...")
 
-    top5 = _call_claude(_build_top5_prompt(), max_tokens=800)
+    rss_articles = _fetch_rss_articles()
+    reddit_articles = _fetch_reddit_posts()
+    all_articles = _deduplicate_articles(rss_articles + reddit_articles)
+
+    logger.info("Fetched %d articles (%d RSS + %d Reddit, %d after dedup)",
+                len(all_articles), len(rss_articles), len(reddit_articles), len(all_articles))
+
+    top5 = _build_top5_from_articles(all_articles)
     if top5:
         db.save_cached_news("top5", top5)
-        logger.info("Cached top5 news updated")
+        logger.info("Cached top5 news updated (%d chars)", len(top5))
 
-    digest = _call_claude(_build_digest_prompt(), max_tokens=4000)
+    digest = _build_digest_from_articles(all_articles)
     if digest:
         db.save_cached_news("digest", digest)
-        logger.info("Cached full digest updated")
+        logger.info("Cached full digest updated (%d chars)", len(digest))
 
     return top5, digest
 
@@ -240,10 +350,8 @@ def send_daily_news(chat_ids=None):
     """Send cached digest to chat IDs, or all subscribers."""
     digest = get_cached_digest()
     if not digest:
-        # No cache — try a fresh fetch
-        digest = _call_claude(_build_digest_prompt(), max_tokens=4000)
-        if digest:
-            db.save_cached_news("digest", digest)
+        refresh_cached_news()
+        digest = get_cached_digest()
 
     if not digest:
         logger.error("Failed to get AI news digest")
@@ -291,13 +399,13 @@ def _handle_start(chat_id, first_name, username):
         "/status — check your subscription\n"
     ))
 
-    # Send cached top 5 instantly, or trigger background refresh
+    # Send cached top 5 instantly, or fetch fresh
     top5 = get_cached_top5()
     if top5:
         _tg_send(chat_id, top5)
     else:
         _tg_send(chat_id, "Fetching today's top AI news — one moment...")
-        _trigger_background_refresh()
+        _trigger_refresh_and_send(chat_id, "top5")
 
 
 def _handle_subscribe(chat_id, first_name, username):
@@ -333,15 +441,23 @@ def _handle_status(chat_id):
         _tg_send(chat_id, "You are not subscribed.\nUse /subscribe to start receiving daily AI news.")
 
 
-def _trigger_background_refresh():
-    """Trigger a background news refresh if cache is empty."""
-    import threading
+def _trigger_refresh_and_send(chat_id, news_type="digest"):
+    """Refresh news in background and send to user when ready."""
     def _do_refresh():
         try:
-            logger.info("Background refresh triggered by user request")
+            logger.info("Background refresh triggered for chat_id=%s", chat_id)
             refresh_cached_news()
+            if news_type == "top5":
+                text = get_cached_top5()
+            else:
+                text = get_cached_digest()
+            if text:
+                _tg_send(chat_id, text)
+            else:
+                _tg_send(chat_id, "Sorry, couldn't fetch news right now. Try /ainews again shortly.")
         except Exception as e:
             logger.error("Background refresh failed: %s", e)
+            _tg_send(chat_id, "Sorry, something went wrong fetching news. Try /ainews again.")
     threading.Thread(target=_do_refresh, daemon=True).start()
 
 
@@ -350,17 +466,8 @@ def _handle_ainews(chat_id):
     if digest:
         _tg_send(chat_id, digest)
     else:
-        _tg_send(chat_id, "Fetching today's AI news now — this takes about 30 seconds. I'll send it shortly!")
-        _trigger_background_refresh()
-        # Wait and check for the result
-        import time
-        for _ in range(6):
-            time.sleep(10)
-            digest = get_cached_digest()
-            if digest:
-                _tg_send(chat_id, digest)
-                return
-        _tg_send(chat_id, "Still working on it. Please try /ainews again in a minute.")
+        _tg_send(chat_id, "Fetching today's AI news now — one moment...")
+        _trigger_refresh_and_send(chat_id, "digest")
 
 
 @ai_news_bp.route("/webhook/ai-news", methods=["POST"])
