@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Gleam &amp; Sip Admin</title>
+<style>
+:root{--green:#6b8f5e;--brown:#4a3728;--cream:#f5f0eb;--card:#fff;--border:#e0d8cf;--red:#c0392b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--cream);color:#333;padding-bottom:80px}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--card);border-radius:16px;padding:32px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.login-box h1{font-size:1.3rem;color:var(--brown);margin-bottom:4px}
+.login-box p{font-size:.82rem;color:#888;margin-bottom:20px}
+.login-box input{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-size:1.1rem;text-align:center;letter-spacing:4px;margin-bottom:14px}
+.login-box input:focus{outline:none;border-color:var(--green)}
+.login-box button{width:100%;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer}
+.login-box .err{color:var(--red);font-size:.8rem;margin-top:8px;display:none}
+.topbar{background:var(--brown);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center}
+.topbar h1{font-size:1rem;font-weight:600}
+.topbar .actions{display:flex;gap:8px}
+.topbar button,.fab{background:var(--green);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer}
+.topbar button:hover,.fab:hover{opacity:.9}
+.grp-bar{display:flex;gap:6px;padding:10px 14px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch}
+.grp-bar::-webkit-scrollbar{display:none}
+.grp-btn{white-space:nowrap;padding:6px 14px;border:2px solid var(--border);border-radius:20px;background:transparent;font-size:.78rem;font-weight:600;color:#666;cursor:pointer;flex-shrink:0}
+.grp-btn.active{background:var(--brown);color:#fff;border-color:var(--brown)}
+.items{padding:10px 14px}
+.cat-hdr{font-size:.75rem;font-weight:700;color:var(--brown);padding:12px 0 4px;border-bottom:2px solid var(--border);margin-top:4px}
+.item-card{background:var(--card);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.item-card .thumb-wrap{width:60px;height:60px;flex-shrink:0;cursor:pointer;position:relative}
+.item-card .thumb-wrap img{width:60px;height:60px;border-radius:10px;object-fit:cover;background:#f0e8df;display:block}
+.item-card .thumb-wrap .ph{width:60px;height:60px;border-radius:10px;background:#f0e8df;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:1.5rem}
+.item-card .info{flex:1;min-width:0}
+.item-card .info h3{font-size:.88rem;color:var(--brown);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-card .info .meta{font-size:.72rem;color:#999}
+.item-card .info .price{font-size:.85rem;font-weight:700;color:var(--green)}
+.item-card .avail{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:1rem}
+.item-card .avail.on{border-color:var(--green);background:#e8f5e9}
+.item-card .avail.off{border-color:var(--red);background:#fbe9e7}
+.item-card .edit-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:.9rem;background:transparent}
+.fab{position:fixed;bottom:24px;right:20px;width:56px;height:56px;border-radius:50%;font-size:1.6rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:40}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding:20px 16px 30px;animation:slideUp .25s ease-out}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal h2{font-size:1.1rem;color:var(--brown);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.modal h2 button{background:none;border:none;font-size:1.3rem;color:#999;cursor:pointer;padding:4px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:.72rem;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:.9rem;background:#faf7f3}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green)}
+.field textarea{resize:vertical;min-height:60px}
+.field-row{display:flex;gap:10px}.field-row .field{flex:1}
+.img-upload{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.img-upload .preview{width:80px;height:80px;border-radius:12px;background:#f0e8df;border:2px dashed var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.img-upload .preview img{width:100%;height:100%;object-fit:cover}
+.img-upload .preview.has-img{border-style:solid}
+.img-upload .info-text{font-size:.75rem;color:#888;flex:1}
+.img-upload .info-text strong{display:block;color:var(--brown);margin-bottom:2px}
+.btn-row{display:flex;gap:10px;margin-top:16px}
+.btn-row button{flex:1;padding:12px;border:none;border-radius:10px;font-size:.9rem;font-weight:600;cursor:pointer}
+.btn-save{background:var(--green);color:#fff}
+.btn-del{background:var(--red);color:#fff}
+.btn-cancel{background:#eee;color:#666}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:10px;font-size:.82rem;z-index:200;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.hidden{display:none!important}
+.loading{text-align:center;padding:40px;color:#999}
+.spin{display:inline-block;width:24px;height:24px;border:3px solid #e0d8cf;border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+    <h1>Gleam &amp; Sip</h1>
+    <p>Admin Panel</p>
+    <input id="pinInput" type="password" inputmode="numeric" placeholder="Enter PIN" maxlength="10" autocomplete="off">
+    <button id="loginBtn">Sign In</button>
+    <div class="err" id="loginErr">Wrong PIN. Try again.</div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="topbar">
+    <h1>Menu Admin</h1>
+    <div class="actions">
+      <button id="refreshBtn">Refresh</button>
+      <button id="logoutBtn" style="background:var(--red)">Logout</button>
+    </div>
+  </div>
+  <div class="grp-bar" id="grpBar"></div>
+  <div class="items" id="itemList">
+    <div class="loading"><div class="spin"></div><br>Loading menu…</div>
+  </div>
+  <button class="fab" id="addBtn" title="Add Item">+</button>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>
+      <span id="modalTitle">Add Item</span>
+      <button id="modalClose">&times;</button>
+    </h2>
+    <div class="img-upload">
+      <div class="preview" id="imgPreview" title="Tap to upload photo">
+        <span style="font-size:1.5rem;color:#ccc">+</span>
+      </div>
+      <input type="file" accept="image/*" id="imgFile" style="display:none">
+      <div class="info-text">
+        <strong>Product Photo</strong>
+        Tap the square to upload from camera or gallery
+      </div>
+    </div>
+    <div class="field"><label>Item Name</label><input id="fName" placeholder="e.g. Matcha Latte"></div>
+    <div class="field-row">
+      <div class="field"><label>Price ($)</label><input id="fPrice" type="number" step="0.01" placeholder="5.50"></div>
+      <div class="field"><label>Category</label>
+        <select id="fCategory">
+          <option>Matcha</option><option>Coffee</option><option>Tea</option>
+          <option>Smoothies</option><option>Soda &amp; Cold</option>
+          <option>Sandwiches</option><option>Bites</option><option>Sweets</option>
+          <option>Combos</option><option>Retail</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Description (optional)</label><textarea id="fDesc" rows="2" placeholder="Short description…"></textarea></div>
+    <div class="field"><label>Available</label>
+      <select id="fAvail">
+        <option value="true">Yes — on the menu</option>
+        <option value="false">No — hidden/sold out</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn-cancel" id="btnCancel">Cancel</button>
+      <button class="btn-del hidden" id="btnDel">Delete</button>
+      <button class="btn-save" id="btnSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "https://gleamsip-checkout.sfdmetaverse.workers.dev";
+const PAGES = "https://gleamandsip.com/mobileorder";
+const GROUP_ORDER = ["Drink", "Food", "Combo", "Take Home"];
+const CAT2GROUP = {
+  "Matcha":"Drink","Coffee":"Drink","Tea":"Drink","Smoothies":"Drink","Soda & Cold":"Drink",
+  "Sandwiches":"Food","Bites":"Food","Sweets":"Food",
+  "Combos":"Combo","Retail":"Take Home"
+};
+
+function getGroup(cat) { return CAT2GROUP[cat] || "Other"; }
+function resolveImg(img) {
+  if (!img) return null;
+  if (img.startsWith("http")) return img;
+  if (img.startsWith("images/")) return PAGES + "/" + img.replace("images/", "images/webp/").replace(".png", ".webp");
+  return API + "/image/" + encodeURIComponent(img);
+}
+
+let PIN = "", menu = [], filterGroup = "All", editingId = null, pendingImageFile = null;
+
+// --- Auth ---
+const savedPin = sessionStorage.getItem("gsPin");
+if (savedPin) { PIN = savedPin; doLogin(true); }
+
+document.getElementById("loginBtn").addEventListener("click", () => doLogin());
+document.getElementById("pinInput").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+async function doLogin(silent) {
+  if (!silent) PIN = document.getElementById("pinInput").value.trim();
+  if (!PIN) return;
+  try {
+    const r = await fetch(API + "/admin/menu", { headers: { "X-Admin-Pin": PIN } });
+    if (!r.ok) throw 0;
+    menu = await r.json() || [];
+    sessionStorage.setItem("gsPin", PIN);
+    document.getElementById("loginScreen").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    renderGroups();
+    renderItems();
+  } catch {
+    if (!silent) {
+      document.getElementById("loginErr").style.display = "block";
+      document.getElementById("pinInput").value = "";
+      document.getElementById("pinInput").focus();
+    }
+  }
+}
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("gsPin"); PIN = "";
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("pinInput").value = "";
+  document.getElementById("loginErr").style.display = "none";
+});
+
+document.getElementById("refreshBtn").addEventListener("click", async () => {
+  showToast("Refreshing…");
+  try {
+    const r = await fetch(API + "/admin/menu", { headers: { "X-Admin-Pin": PIN } });
+    menu = await r.json() || [];
+    renderGroups(); renderItems();
+    showToast("Menu refreshed");
+  } catch { showToast("Failed to refresh"); }
+});
+
+// --- Groups ---
+function renderGroups() {
+  const bar = document.getElementById("grpBar");
+  const groups = ["All", ...GROUP_ORDER];
+  bar.innerHTML = groups.map(g =>
+    `<button class="grp-btn${g === filterGroup ? ' active' : ''}" data-grp="${g}">${g}</button>`
+  ).join("");
+  bar.querySelectorAll(".grp-btn").forEach(b => {
+    b.addEventListener("click", () => { filterGroup = b.dataset.grp; renderGroups(); renderItems(); });
+  });
+}
+
+// --- Items ---
+function renderItems() {
+  const list = document.getElementById("itemList");
+  const filtered = filterGroup === "All" ? [...menu] : menu.filter(i => getGroup(i.category) === filterGroup);
+
+  if (!filtered.length) { list.innerHTML = '<div style="text-align:center;padding:40px;color:#999">No items</div>'; return; }
+
+  // Sort by group → category → sortOrder
+  filtered.sort((a, b) => {
+    const ga = GROUP_ORDER.indexOf(getGroup(a.category)), gb = GROUP_ORDER.indexOf(getGroup(b.category));
+    if (ga !== gb) return ga - gb;
+    if (a.category !== b.category) return a.category < b.category ? -1 : 1;
+    return (a.sortOrder || 0) - (b.sortOrder || 0);
+  });
+
+  let lastCat = "";
+  list.innerHTML = filtered.map(item => {
+    const imgSrc = resolveImg(item.image);
+    let hdr = "";
+    if (item.category !== lastCat) {
+      lastCat = item.category;
+      hdr = `<div class="cat-hdr">${getGroup(item.category)} — ${esc(item.category)}</div>`;
+    }
+    return hdr + `<div class="item-card" data-id="${item.id}">
+      <div class="thumb-wrap" data-upload="${item.id}">
+        ${imgSrc
+          ? `<img src="${imgSrc}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="ph" style="display:none">📷</div>`
+          : `<div class="ph">📷</div>`}
+      </div>
+      <div class="info">
+        <h3>${esc(item.name)}</h3>
+        <div class="meta">${esc(item.category || "")}${item.description ? " · " + esc(item.description.slice(0,40)) : ""}</div>
+        <div class="price">$${(item.price || 0).toFixed(2)}</div>
+      </div>
+      <div class="avail ${item.available !== false ? 'on' : 'off'}" data-toggle="${item.id}" title="Toggle">${item.available !== false ? '✓' : '✗'}</div>
+      <div class="edit-btn" data-edit="${item.id}" title="Edit">✏️</div>
+    </div>`;
+  }).join("");
+
+  // Event listeners
+  list.querySelectorAll("[data-toggle]").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); toggleAvail(b.dataset.toggle); });
+  });
+  list.querySelectorAll("[data-edit]").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); openEdit(b.dataset.edit); });
+  });
+  list.querySelectorAll("[data-upload]").forEach(wrap => {
+    wrap.addEventListener("click", e => { e.stopPropagation(); quickImgUpload(wrap.dataset.upload); });
+  });
+}
+
+async function toggleAvail(id) {
+  const item = menu.find(i => i.id === id);
+  if (!item) return;
+  item.available = item.available === false ? true : false;
+  showToast(item.available ? "Available" : "Unavailable");
+  renderItems();
+  try {
+    await fetch(API + "/admin/item", {
+      method: "PUT", headers: { "Content-Type": "application/json", "X-Admin-Pin": PIN },
+      body: JSON.stringify(item)
+    });
+  } catch { showToast("Failed"); }
+}
+
+function quickImgUpload(id) {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.addEventListener("change", async () => {
+    const f = inp.files[0]; if (!f) return;
+    showToast("Uploading…");
+    const item = menu.find(i => i.id === id);
+    const fn = await uploadImage(f, item ? item.id : id);
+    if (fn && item) {
+      item.image = fn;
+      await fetch(API + "/admin/item", {
+        method: "PUT", headers: { "Content-Type": "application/json", "X-Admin-Pin": PIN },
+        body: JSON.stringify(item)
+      });
+      renderItems();
+      showToast("Image updated!");
+    }
+  });
+  inp.click();
+}
+
+// --- Modal ---
+const modal = document.getElementById("modal");
+const imgPreview = document.getElementById("imgPreview");
+const imgFile = document.getElementById("imgFile");
+
+document.getElementById("addBtn").addEventListener("click", () => openAdd());
+document.getElementById("modalClose").addEventListener("click", closeModal);
+document.getElementById("btnCancel").addEventListener("click", closeModal);
+modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+function openAdd() {
+  editingId = null; pendingImageFile = null;
+  document.getElementById("modalTitle").textContent = "Add Item";
+  document.getElementById("fName").value = "";
+  document.getElementById("fPrice").value = "";
+  // Default category based on group filter
+  let defCat = "Matcha";
+  if (filterGroup === "Food") defCat = "Sandwiches";
+  else if (filterGroup === "Combo") defCat = "Combos";
+  else if (filterGroup === "Take Home") defCat = "Retail";
+  document.getElementById("fCategory").value = defCat;
+  document.getElementById("fDesc").value = "";
+  document.getElementById("fAvail").value = "true";
+  imgPreview.innerHTML = '<span style="font-size:1.5rem;color:#ccc">+</span>';
+  imgPreview.classList.remove("has-img");
+  document.getElementById("btnDel").classList.add("hidden");
+  modal.classList.add("open");
+}
+
+function openEdit(id) {
+  const item = menu.find(i => i.id === id);
+  if (!item) return;
+  editingId = id; pendingImageFile = null;
+  document.getElementById("modalTitle").textContent = "Edit Item";
+  document.getElementById("fName").value = item.name || "";
+  document.getElementById("fPrice").value = item.price || "";
+  document.getElementById("fCategory").value = item.category || "Matcha";
+  document.getElementById("fDesc").value = item.description || "";
+  document.getElementById("fAvail").value = item.available !== false ? "true" : "false";
+  if (item.image) {
+    const src = resolveImg(item.image);
+    imgPreview.innerHTML = `<img src="${src}" onerror="this.parentElement.innerHTML='<span style=font-size:1.5rem;color:#ccc>+</span>'">`;
+    imgPreview.classList.add("has-img");
+  } else {
+    imgPreview.innerHTML = '<span style="font-size:1.5rem;color:#ccc">+</span>';
+    imgPreview.classList.remove("has-img");
+  }
+  document.getElementById("btnDel").classList.remove("hidden");
+  modal.classList.add("open");
+}
+
+function closeModal() { modal.classList.remove("open"); editingId = null; pendingImageFile = null; }
+
+imgPreview.addEventListener("click", () => imgFile.click());
+imgFile.addEventListener("change", () => {
+  const f = imgFile.files[0]; if (!f) return;
+  pendingImageFile = f;
+  imgPreview.innerHTML = `<img src="${URL.createObjectURL(f)}">`;
+  imgPreview.classList.add("has-img");
+});
+
+// Save
+document.getElementById("btnSave").addEventListener("click", async () => {
+  const name = document.getElementById("fName").value.trim();
+  const price = parseFloat(document.getElementById("fPrice").value) || 0;
+  const category = document.getElementById("fCategory").value;
+  const description = document.getElementById("fDesc").value.trim();
+  const available = document.getElementById("fAvail").value === "true";
+
+  if (!name) { showToast("Name is required"); return; }
+  if (price <= 0) { showToast("Price must be > 0"); return; }
+  showToast("Saving…");
+
+  let imageFilename = null;
+  if (pendingImageFile) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    imageFilename = await uploadImage(pendingImageFile, slug);
+  }
+
+  const id = editingId || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const item = { id, name, price, category, description, available,
+    sortOrder: editingId ? (menu.find(i => i.id === editingId)?.sortOrder ?? menu.length) : menu.length };
+
+  if (imageFilename) { item.image = imageFilename; }
+  else if (editingId) { const ex = menu.find(i => i.id === editingId); if (ex?.image) item.image = ex.image; }
+
+  try {
+    const r = await fetch(API + "/admin/item", {
+      method: "PUT", headers: { "Content-Type": "application/json", "X-Admin-Pin": PIN },
+      body: JSON.stringify(item)
+    });
+    if (!r.ok) throw 0;
+    const idx = menu.findIndex(i => i.id === id);
+    if (idx >= 0) menu[idx] = { ...menu[idx], ...item }; else menu.push(item);
+    closeModal(); renderGroups(); renderItems();
+    showToast(editingId ? "Item updated!" : "Item added!");
+  } catch { showToast("Failed to save item"); }
+});
+
+// Delete
+document.getElementById("btnDel").addEventListener("click", async () => {
+  if (!editingId) return;
+  const item = menu.find(i => i.id === editingId);
+  if (!confirm(`Delete "${item?.name || editingId}"?`)) return;
+  showToast("Deleting…");
+  try {
+    await fetch(API + "/admin/item/" + encodeURIComponent(editingId), {
+      method: "DELETE", headers: { "X-Admin-Pin": PIN }
+    });
+    menu = menu.filter(i => i.id !== editingId);
+    closeModal(); renderGroups(); renderItems();
+    showToast("Item deleted");
+  } catch { showToast("Failed to delete"); }
+});
+
+// --- Image Upload ---
+async function uploadImage(file, slug) {
+  try {
+    const compressed = await compressImage(file, 1200, 0.82);
+    const fn = slug + ".jpg";
+    const fd = new FormData();
+    fd.append("file", compressed, fn);
+    const r = await fetch(API + "/admin/image", { method: "POST", headers: { "X-Admin-Pin": PIN }, body: fd });
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    showToast("Image uploaded!");
+    return d.filename;
+  } catch { showToast("Image upload failed"); return null; }
+}
+
+function compressImage(file, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round((h / w) * maxSize); w = maxSize; }
+        else { w = Math.round((w / h) * maxSize); h = maxSize; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(objectUrl);
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("compress failed"));
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("image decode failed"));
+    };
+    img.src = objectUrl;
+  });
+}
+
+// --- Helpers ---
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._to); t._to = setTimeout(() => t.classList.remove("show"), 2500);
+}
+</script>
+</body>
+</html>
