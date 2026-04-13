@@ -1740,6 +1740,27 @@ def serve_upload(filename):
     return send_from_directory(UPLOAD_DIR / str(current_user.org_id), filename)
 
 
+DEPLOY_DIR = DATA_DIR / "deploy"
+
+
+@app.route("/events/")
+@app.route("/events/<path:filename>")
+def serve_events(filename="index.html"):
+    return send_from_directory(DEPLOY_DIR / "events", filename)
+
+
+@app.route("/referral/")
+@app.route("/referral/<path:filename>")
+def serve_referral(filename="index.html"):
+    return send_from_directory(DEPLOY_DIR / "referral", filename)
+
+
+@app.route("/mobileorder/")
+@app.route("/mobileorder/<path:filename>")
+def serve_mobileorder(filename="index.html"):
+    return send_from_directory(DEPLOY_DIR / "mobileorder", filename)
+
+
 @app.route("/api/add-txn", methods=["POST"])
 @login_required
 def api_add_txn():
